@@ -13,9 +13,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 
   <script>
     tailwind.config = {
@@ -37,6 +37,26 @@
       word-break: keep-all !important;
       overflow-wrap: normal !important;
     }
+    @media (min-width: 1024px) {
+      #spreadsheetTableWrap > div {
+        overflow-x: hidden !important;
+      }
+      #dungeonTable {
+        width: 100% !important;
+        min-width: 100% !important;
+        table-layout: auto !important;
+      }
+      #dungeonTable th, #dungeonTable td {
+        padding-left: 3px !important;
+        padding-right: 3px !important;
+        font-size: 11px !important;
+      }
+    }
+    @media (max-width: 1023px) {
+      #spreadsheetTableWrap > div {
+        overflow-x: auto !important;
+      }
+    }
     .touch-active:active { transform: scale(0.97); opacity: 0.85; }
     @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
     .animate-fade-up { animation: fadeUp .25s ease-out both; }
@@ -46,7 +66,7 @@
 
 <!-- ========== HEADER ========== -->
 <header class="bg-gradient-to-r from-sky-600 via-sky-700 to-indigo-700 text-white shadow-md sticky top-0 z-30">
-  <div class="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+  <div class="w-full max-w-[99%] 2xl:max-w-[1920px] mx-auto px-2 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2">
     <div class="flex items-center gap-2 sm:gap-3 min-w-0">
       <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg sm:text-xl shrink-0">⚔️</div>
       <div class="min-w-0">
@@ -79,7 +99,7 @@
 
 <!-- ========== ADMIN TOOLBAR (only visible when admin is approved & logged in) ========== -->
 <div id="adminToolbar" class="hidden bg-slate-900 text-white border-b border-slate-700">
-  <div class="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-2 flex-wrap">
+  <div class="w-full max-w-[99%] 2xl:max-w-[1920px] mx-auto px-2 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
     <div class="flex items-center gap-2 text-xs text-slate-300">
       <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
       <span class="font-semibold text-emerald-400">โหมดแอดมิน</span>
@@ -104,13 +124,13 @@
 
 <!-- ========== FIREBASE NOTICE BANNER ========== -->
 <div id="firebaseNoticeBanner" class="hidden bg-sky-50 border-b border-sky-200 text-sky-900 px-3 sm:px-6 py-2 text-xs">
-  <div class="w-full max-w-7xl mx-auto flex items-center justify-between gap-2">
+  <div class="w-full max-w-[99%] 2xl:max-w-[1920px] mx-auto flex items-center justify-between gap-2">
     <div class="flex items-center gap-2"><span>🔥</span><span id="firebaseNoticeText"></span></div>
   </div>
 </div>
 
 <!-- ========== MAIN CONTENT ========== -->
-<main class="w-full max-w-7xl mx-auto px-2 sm:px-6 py-3 sm:py-6 flex-1 space-y-3 sm:space-y-6">
+<main class="w-full max-w-[99%] 2xl:max-w-[1920px] mx-auto px-1 sm:px-3 py-2 sm:py-4 flex-1 space-y-3">
 
   <!-- KPI Cards -->
   <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
@@ -189,12 +209,12 @@
         📱 <span>แบบการ์ดสรุป</span>
       </button>
     </div>
-    <div class="text-[11px] text-slate-500 font-medium flex items-center gap-1 bg-sky-50 text-sky-800 px-2.5 py-1 rounded-lg border border-sky-100">
+    <div class="block lg:hidden text-[11px] text-slate-500 font-medium flex items-center gap-1 bg-sky-50 text-sky-800 px-2.5 py-1 rounded-lg border border-sky-100">
       <span>👈</span><span>เลื่อนแนวนอนเพื่อดูข้อมูลทั้งหมด</span><span>👉</span>
     </div>
   </div>
 
-  <!-- SPREADSHEET TABLE (Horizontal Scroll on all screens with no overlapping text) -->
+  <!-- SPREADSHEET TABLE (Horizontal Scroll on mobile, Fullscreen Responsive on PC) -->
   <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden block" id="spreadsheetTableWrap">
     <div class="bg-[#5bc0de] text-white py-2 px-4 text-center font-bold text-sm sm:text-base flex items-center justify-between whitespace-nowrap">
       <span></span>
@@ -203,23 +223,23 @@
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>Realtime
       </span>
     </div>
-    <!-- Horizontal Scroll Container: text will NEVER wrap or overlap -->
+    <!-- Table Container: scrolls on mobile, full width on PC -->
     <div class="overflow-x-auto w-full touch-pan-x" style="-webkit-overflow-scrolling: touch;">
-      <table class="w-full text-xs text-center border-collapse whitespace-nowrap" id="dungeonTable" style="min-width: 1400px;">
+      <table class="w-full text-xs text-center border-collapse whitespace-nowrap" id="dungeonTable">
         <thead>
-          <tr class="bg-[#5bc0de] text-slate-900 font-bold border-b border-sky-400 whitespace-nowrap">
-            <th rowspan="2" class="py-2.5 px-3 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap" style="min-width:85px;">Payment</th>
-            <th rowspan="2" class="py-2.5 px-3 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap" style="min-width:75px;">Date</th>
-            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap" style="min-width:65px;">Time</th>
-            <th rowspan="2" class="py-2.5 px-3 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap" style="min-width:100px;">CTM</th>
-            <th rowspan="2" class="py-2.5 px-3 table-cell-border bg-sky-200/90 font-bold text-right whitespace-nowrap" style="min-width:90px;">Price</th>
-            <th rowspan="2" class="py-2.5 px-4 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap" style="min-width:130px;">Detail</th>
-            <th rowspan="2" class="py-2.5 px-3 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap" style="min-width:85px;">Sale by</th>
-            <th rowspan="2" class="py-2.5 px-3 table-cell-border bg-sky-300/90 font-bold text-right whitespace-nowrap" style="min-width:85px;">Com 10%</th>
-            <th colspan="11" id="playerGroupHeader" class="py-1.5 px-3 table-cell-border bg-sky-200 tracking-wider uppercase font-extrabold text-[11px] whitespace-nowrap">PLAYER (ทีมแบก - ค่าแรงหารเท่า)</th>
-            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-indigo-100 text-indigo-950 font-semibold whitespace-nowrap" style="min-width:75px;">สลิป</th>
-            <th rowspan="2" class="py-2.5 px-3 table-cell-border bg-sky-200/90 font-bold text-right whitespace-nowrap" style="min-width:95px;">Total</th>
-            <th rowspan="2" class="admin-col py-2.5 px-2 table-cell-border bg-slate-200 font-semibold whitespace-nowrap" style="min-width:65px;">จัดการ</th>
+          <tr class="bg-[#5bc0de] text-slate-900 font-bold border-b border-sky-400 whitespace-nowrap text-[11px] xl:text-xs">
+            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Payment</th>
+            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Date</th>
+            <th rowspan="2" class="py-2 px-1 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Time</th>
+            <th rowspan="2" class="py-2 px-2 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">CTM</th>
+            <th rowspan="2" class="py-2 px-2 table-cell-border bg-sky-200/90 font-bold text-right whitespace-nowrap">Price</th>
+            <th rowspan="2" class="py-2 px-2.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Detail</th>
+            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Sale by</th>
+            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-300/90 font-bold text-right whitespace-nowrap">Com 10%</th>
+            <th colspan="11" id="playerGroupHeader" class="py-1 px-2 table-cell-border bg-sky-200 tracking-wider uppercase font-extrabold text-[10px] xl:text-[11px] whitespace-nowrap">PLAYER (ทีมแบก - ค่าแรงหารเท่า)</th>
+            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-indigo-100 text-indigo-950 font-semibold whitespace-nowrap">สลิป</th>
+            <th rowspan="2" class="py-2 px-2 table-cell-border bg-sky-200/90 font-bold text-right whitespace-nowrap">Total</th>
+            <th rowspan="2" class="admin-col py-2 px-1.5 table-cell-border bg-slate-200 font-semibold whitespace-nowrap">จัดการ</th>
           </tr>
           <tr class="bg-sky-100 text-slate-800 font-semibold text-[11px] whitespace-nowrap" id="playerHeaderRow"></tr>
         </thead>
@@ -270,74 +290,72 @@
 
 <!-- ========== MODALS ========== -->
 
-<!-- Auth Modal (Login / Register) -->
+<!-- Auth Modal (Google Login & Profile) -->
 <div id="authModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 overflow-y-auto">
   <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 animate-fade-up">
     <div class="p-4 bg-gradient-to-r from-sky-600 to-indigo-600 text-white flex items-center justify-between">
-      <h3 class="font-bold text-sm" id="authModalTitle">🔐 เข้าสู่ระบบผู้ดูแล</h3>
+      <h3 class="font-bold text-sm flex items-center gap-2" id="authModalTitle">🔐 เข้าสู่ระบบผู้ดูแล</h3>
       <button onclick="closeAuthModal()" class="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition text-sm">✕</button>
     </div>
 
-    <!-- Tab: Login -->
-    <div id="authTabLogin" class="p-4 space-y-3 text-xs">
-      <div class="flex bg-slate-100 p-0.5 rounded-lg">
-        <button onclick="showAuthTab('login')" id="tabBtnLogin" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition bg-white text-sky-700 shadow-sm">เข้าสู่ระบบ</button>
-        <button onclick="showAuthTab('register')" id="tabBtnRegister" class="flex-1 py-1.5 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-700">สมัครใหม่</button>
+    <!-- State 1: Not logged in (Google Sign-In) -->
+    <div id="authPanelLoggedOut" class="p-6 space-y-4 text-center">
+      <div class="w-14 h-14 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center mx-auto text-2xl shadow-inner">
+        🛡️
       </div>
-      <form onsubmit="handleLogin(event)" class="space-y-2.5">
-        <div>
-          <label class="block font-medium text-slate-700 mb-0.5">Email</label>
-          <input type="email" id="loginEmail" required placeholder="admin@example.com" autocomplete="email" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
-        </div>
-        <div>
-          <label class="block font-medium text-slate-700 mb-0.5">Password</label>
-          <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
-        </div>
-        <div id="loginErrorMsg" class="hidden p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px]"></div>
-        <button type="submit" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg shadow transition touch-active text-sm">เข้าสู่ระบบ</button>
-      </form>
-      <p class="text-center text-[10px] text-slate-400 pt-1">สิทธิ์ Admin ต้องได้รับการอนุมัติจาก Admin ก่อน</p>
-    </div>
+      <div>
+        <h4 class="font-bold text-slate-800 text-base">เข้าสู่ระบบผู้ดูแล</h4>
+        <p class="text-xs text-slate-500 mt-1">ล็อกอินด้วยบัญชี Google ของคุณได้ทันที</p>
+      </div>
 
-    <!-- Tab: Register -->
-    <div id="authTabRegister" class="hidden p-4 space-y-3 text-xs">
-      <div class="flex bg-slate-100 p-0.5 rounded-lg">
-        <button onclick="showAuthTab('login')" id="tabBtnLogin2" class="flex-1 py-1.5 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-700">เข้าสู่ระบบ</button>
-        <button onclick="showAuthTab('register')" id="tabBtnRegister2" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition bg-white text-sky-700 shadow-sm">สมัครใหม่</button>
-      </div>
-      <form onsubmit="handleRegister(event)" class="space-y-2.5">
-        <div>
-          <label class="block font-medium text-slate-700 mb-0.5">ชื่อ / ฉายา</label>
-          <input type="text" id="regDisplayName" required placeholder="เช่น K.Top หรือ Top" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
-        </div>
-        <div>
-          <label class="block font-medium text-slate-700 mb-0.5">Email</label>
-          <input type="email" id="regEmail" required placeholder="your@email.com" autocomplete="email" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
-        </div>
-        <div>
-          <label class="block font-medium text-slate-700 mb-0.5">Password (อย่างน้อย 6 ตัว)</label>
-          <input type="password" id="regPassword" required minlength="6" placeholder="••••••••" autocomplete="new-password" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
-        </div>
-        <div id="regErrorMsg" class="hidden p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px]"></div>
-        <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow transition touch-active text-sm">สมัครสมาชิก</button>
-      </form>
-      <div class="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-800">
-        ⚠️ หลังสมัครแล้ว Admin จะต้องอนุมัติ role ให้ก่อนจึงจะใช้งานได้
+      <button type="button" onclick="handleGoogleSignIn()" class="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 hover:shadow-md transition font-semibold text-slate-700 text-sm touch-active shadow-sm">
+        <svg class="w-5 h-5" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span>เข้าสู่ระบบด้วย Google</span>
+      </button>
+
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-left text-[11px] text-slate-500 space-y-1">
+        <p class="font-semibold text-slate-700">💡 การกำหนดสิทธิ์แอดมินใน Database:</p>
+        <p>เมื่อล็อกอินแล้ว ข้อมูลจะถูกเก็บใน <code class="bg-slate-200 px-1 rounded text-slate-700">users</code> โดยเก็บ <code class="bg-slate-200 px-1 rounded text-slate-700">userid</code>, <code class="bg-slate-200 px-1 rounded text-slate-700">email</code>, และ <code class="bg-slate-200 px-1 rounded text-slate-700">rule</code> ให้เจ้าของระบบเปลี่ยนเป็น <code class="text-indigo-600 font-bold">rule: "admin"</code> เพื่อเปิดสิทธิ์</p>
       </div>
     </div>
 
-    <!-- Tab: Pending -->
-    <div id="authTabPending" class="hidden p-5 text-center space-y-3">
-      <div class="w-12 h-12 mx-auto bg-amber-100 rounded-full flex items-center justify-center text-2xl">⏳</div>
-      <h4 class="font-bold text-slate-800 text-sm">รอการอนุมัติ</h4>
-      <p class="text-xs text-slate-500">บัญชี <span id="pendingEmail" class="font-semibold text-slate-700"></span><br>ลงทะเบียนแล้ว รอ Admin อนุมัติ role</p>
-      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-left text-[11px] text-slate-600 space-y-1">
-        <p class="font-semibold text-slate-700">Admin ทำได้ 2 วิธี:</p>
-        <p>1. ไป <strong>Firestore Console</strong> → <code class="bg-slate-200 px-1 rounded">users/{uid}</code> → เปลี่ยน <code class="bg-slate-200 px-1 rounded">role</code> เป็น <code class="bg-emerald-100 text-emerald-800 px-1 rounded">admin</code> หรือ <code class="bg-sky-100 text-sky-800 px-1 rounded">member</code></p>
+    <!-- State 2: Logged in (Show User Profile, UID & Status) -->
+    <div id="authPanelLoggedIn" class="hidden p-5 space-y-4">
+      <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+        <img id="userProfilePhoto" src="https://www.gravatar.com/avatar/?d=mp" alt="Avatar" class="w-12 h-12 rounded-full border border-slate-300 object-cover shrink-0">
+        <div class="min-w-0">
+          <h4 id="userProfileName" class="font-bold text-slate-800 text-sm truncate"></h4>
+          <p id="userProfileEmail" class="text-xs text-slate-500 truncate font-mono"></p>
+          <div class="mt-1">
+            <span id="userProfileRuleBadge" class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold"></span>
+          </div>
+        </div>
       </div>
-      <div class="space-y-1.5 pt-1">
-        <button onclick="checkApprovalStatus()" class="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg shadow transition touch-active text-xs">🔄 ตรวจสอบสถานะ</button>
-        <button onclick="handleSignOut()" class="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg transition text-xs">ออกจากระบบ</button>
+
+      <!-- Copy UID Box -->
+      <div class="p-3 bg-indigo-50/70 rounded-xl border border-indigo-100 text-left space-y-1.5">
+        <label class="block text-[11px] font-semibold text-indigo-900">User ID (สำหรับค้นหาใน Database):</label>
+        <div class="flex items-center gap-1.5">
+          <input type="text" id="userProfileUid" readonly class="flex-1 px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-[11px] font-mono text-slate-700 select-all focus:outline-none">
+          <button type="button" onclick="copyUidToClipboard()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition touch-active whitespace-nowrap">
+            คัดลอก
+          </button>
+        </div>
+        <p class="text-[10px] text-indigo-700 leading-tight">ตั้งค่า <code class="bg-indigo-100 px-1 rounded font-bold">rule: "admin"</code> ที่ document นี้ใน Firestore เพื่อเปิดโหมดแอดมิน</p>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <button type="button" onclick="checkApprovalStatus()" class="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg shadow-sm transition touch-active text-xs">
+          🔄 ตรวจสอบสิทธิ์อีกครั้ง
+        </button>
+        <button type="button" onclick="handleSignOut()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition touch-active text-xs">
+          ออกจากระบบ
+        </button>
       </div>
     </div>
   </div>
@@ -551,6 +569,7 @@ let app, db, auth, isFirebaseReady = false;
 try {
   app = firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
+  db.settings({ ignoreUndefinedProperties: true });
   auth = firebase.auth();
   isFirebaseReady = true;
 } catch (e) { console.error("Firebase init:", e); }
@@ -564,12 +583,11 @@ const DEFAULT_PLAYERS = [
 ];
 let PLAYERS = [...DEFAULT_PLAYERS];
 
-// Initial sample data (ลบออกแล้ว — เริ่มด้วยตารางว่างเปล่า)
-
 // State
 let runs = [], selectedPlayerFilter = null, currentSlipBase64 = null;
 let currentUser = null, isApprovedAdmin = false;
 let currentViewMode = 'table';
+let unsubscribeRuns = null, unsubscribePlayers = null;
 
 // ========== INIT ==========
 function init() {
@@ -599,20 +617,21 @@ function init() {
 
 // ========== FIRESTORE REALTIME ==========
 function setupRealtimeFirestore() {
+  if (!isFirebaseReady) return;
   const badge = document.getElementById('firebaseStatusBadge');
   const banner = document.getElementById('firebaseNoticeBanner');
 
+  if (unsubscribeRuns) { unsubscribeRuns(); unsubscribeRuns = null; }
+  if (unsubscribePlayers) { unsubscribePlayers(); unsubscribePlayers = null; }
+
   // Realtime Listen to Runs
-  db.collection("runs").orderBy("order","asc").onSnapshot(snap => {
+  unsubscribeRuns = db.collection("runs").orderBy("order","asc").onSnapshot(snap => {
     badge.className = "hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/40";
     badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>Firebase Online</span>';
 
-    if (snap.empty) {
-      banner.classList.add('hidden');
-      runs = [];
-    } else {
-      banner.classList.add('hidden');
-      runs = [];
+    if (banner) banner.classList.add('hidden');
+    runs = [];
+    if (!snap.empty) {
       snap.forEach(doc => runs.push({id: doc.id, ...doc.data()}));
     }
     renderAll();
@@ -620,20 +639,21 @@ function setupRealtimeFirestore() {
     console.warn("Firestore runs error:", err);
     badge.className = "hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-200 border border-amber-400/40";
     badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span><span>Local Mode</span>';
-    banner.classList.remove('hidden');
-    document.getElementById('firebaseNoticeText').innerHTML = '⚠️ ไม่สามารถอ่าน Firestore ได้ (ตรวจ Rules) ใช้ Local Storage ชั่วคราว';
-    document.getElementById('bannerActionGroup').classList.add('hidden');
     fallbackLocal();
   });
 
   // Realtime Listen to Players (คนงาน)
-  db.collection("players").orderBy("order","asc").onSnapshot(snap => {
+  unsubscribePlayers = db.collection("players").orderBy("order","asc").onSnapshot(snap => {
     if (!snap.empty) {
       PLAYERS = [];
       snap.forEach(doc => PLAYERS.push({ id: doc.id, ...doc.data() }));
       savePlayersToLocal();
     } else {
-      seedDefaultPlayers();
+      if (isApprovedAdmin) {
+        seedDefaultPlayers();
+      } else {
+        PLAYERS = [...DEFAULT_PLAYERS];
+      }
     }
     renderPlayerHeader();
     renderPlayerChips();
@@ -914,11 +934,16 @@ function loadLogs() {
 async function checkAdminApproval(uid) {
   if (!isFirebaseReady || !uid) { isApprovedAdmin = false; return; }
   try {
-    // Check users/{uid}.role === 'admin'
     const doc = await db.collection('users').doc(uid).get();
-    isApprovedAdmin = doc.exists && doc.data().role === 'admin';
+    if (doc.exists) {
+      const data = doc.data();
+      const userRule = String(data.rule || data.role || '').trim().toLowerCase();
+      isApprovedAdmin = (userRule === 'admin');
+    } else {
+      isApprovedAdmin = false;
+    }
   } catch(e) {
-    console.warn('Check admin role error:', e);
+    console.warn('Check admin rule error:', e);
     isApprovedAdmin = false;
   }
 }
@@ -953,102 +978,129 @@ function updateAuthUI() {
   }
 }
 
-// ========== AUTH SYSTEM ==========
-// Role-based: users/{uid}.role = 'admin' | 'member'
-// Admin sets roles directly in Firestore Console
+// ========== AUTH SYSTEM (Google Sign-In + Rule: member/admin) ==========
+async function handleGoogleSignIn() {
+  if (!isFirebaseReady) {
+    alert("Firebase ยังไม่พร้อมใช้งาน");
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
 
-// ========== AUTH MODAL ==========
+  try {
+    const result = await auth.signInWithPopup(provider);
+    const user = result.user;
+
+    // Database เก็บ: userid, email, rule
+    const userRef = db.collection('users').doc(user.uid);
+    const doc = await userRef.get();
+
+    if (!doc.exists) {
+      // First time Google sign-in: save userid, email, rule: 'member'
+      await userRef.set({
+        userid: user.uid,
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email || '',
+        photoURL: user.photoURL || '',
+        rule: 'member',
+        role: 'member',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      await writeLog('USER_JOIN', `ผู้ใช้ใหม่ลงชื่อเข้าใช้ด้วย Google: ${user.email} (${user.uid})`);
+    } else {
+      // Update last login
+      await userRef.set({
+        userid: user.uid,
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email || '',
+        photoURL: user.photoURL || '',
+        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
+    await checkAdminApproval(user.uid);
+    updateAuthUI();
+    closeAuthModal();
+    renderAll();
+  } catch(err) {
+    if (err.code === 'auth/popup-closed-by-user') return;
+    if (err.code === 'auth/popup-blocked') {
+      alert('เบราว์เซอร์บล็อกหน้าต่าง Pop-up กรุณาอนุญาต Pop-up สำหรับหน้านี้แล้วลองใหม่อีกครั้ง');
+      return;
+    }
+    if (err.code === 'auth/configuration-not-found' || err.code === 'auth/operation-not-allowed') {
+      alert('⚠️ ยังไม่ได้เปิดใช้งาน Google Sign-in ใน Firebase Console\n\nวิธีเปิด:\n1. ไป Firebase Console -> Authentication -> Sign-in method\n2. กด Add provider -> เลือก Google -> กด Enable -> Save');
+      return;
+    }
+    alert('เข้าสู่ระบบด้วย Google ไม่สำเร็จ: ' + err.message);
+  }
+}
+
 function openAuthModal() {
-  if (currentUser && !isApprovedAdmin) {
-    showAuthTab('pending');
-    document.getElementById('pendingEmail').textContent = currentUser.displayName || currentUser.email;
+  const panelOut = document.getElementById('authPanelLoggedOut');
+  const panelIn = document.getElementById('authPanelLoggedIn');
+  const modalTitle = document.getElementById('authModalTitle');
+
+  if (currentUser) {
+    modalTitle.textContent = isApprovedAdmin ? '🛡️ ข้อมูลผู้ดูแล (Admin)' : '👤 ข้อมูลบัญชีผู้ใช้';
+    panelOut.classList.add('hidden');
+    panelIn.classList.remove('hidden');
+
+    const photoEl = document.getElementById('userProfilePhoto');
+    if (currentUser.photoURL) {
+      photoEl.src = currentUser.photoURL;
+    } else {
+      photoEl.src = 'https://www.gravatar.com/avatar/?d=mp';
+    }
+    document.getElementById('userProfileName').textContent = currentUser.displayName || 'Google User';
+    document.getElementById('userProfileEmail').textContent = currentUser.email || '';
+    document.getElementById('userProfileUid').value = currentUser.uid;
+
+    const badge = document.getElementById('userProfileRuleBadge');
+    if (isApprovedAdmin) {
+      badge.textContent = 'สิทธิ์: Admin (ผู้ดูแลระบบ)';
+      badge.className = 'inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+    } else {
+      badge.textContent = 'สิทธิ์: Member (ยังไม่มีสิทธิ์ผู้ดูแล)';
+      badge.className = 'inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300';
+    }
   } else {
-    showAuthTab('login');
+    modalTitle.textContent = '🔐 เข้าสู่ระบบผู้ดูแล';
+    panelOut.classList.remove('hidden');
+    panelIn.classList.add('hidden');
   }
   document.getElementById('authModal').classList.remove('hidden');
 }
 
-function closeAuthModal() { document.getElementById('authModal').classList.add('hidden'); }
-
-function showAuthTab(tab) {
-  document.getElementById('authTabLogin').classList.toggle('hidden', tab !== 'login');
-  document.getElementById('authTabRegister').classList.toggle('hidden', tab !== 'register');
-  document.getElementById('authTabPending').classList.toggle('hidden', tab !== 'pending');
+function closeAuthModal() {
+  document.getElementById('authModal').classList.add('hidden');
 }
 
-async function handleLogin(e) {
-  e.preventDefault();
-  const email = document.getElementById('loginEmail').value.trim();
-  const pass = document.getElementById('loginPassword').value;
-  const errDiv = document.getElementById('loginErrorMsg');
-  errDiv.classList.add('hidden');
-  try {
-    await auth.signInWithEmailAndPassword(email, pass);
-    closeAuthModal();
-  } catch(err) {
-    errDiv.textContent =
-      err.code === 'auth/user-not-found' ? 'ไม่พบ email นี้ในระบบ กรุณาสมัครก่อน' :
-      err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' ? 'รหัสผ่านไม่ถูกต้อง' :
-      err.code === 'auth/invalid-email' ? 'รูปแบบ email ไม่ถูกต้อง' :
-      'เข้าสู่ระบบไม่สำเร็จ: ' + err.message;
-    errDiv.classList.remove('hidden');
-  }
-}
-
-async function handleRegister(e) {
-  e.preventDefault();
-  const displayName = document.getElementById('regDisplayName').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const pass = document.getElementById('regPassword').value;
-  const errDiv = document.getElementById('regErrorMsg');
-  errDiv.classList.add('hidden');
-
-  if (!displayName) {
-    errDiv.textContent = 'กรุณากรอกชื่อ/ฉายา';
-    errDiv.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const cred = await auth.createUserWithEmailAndPassword(email, pass);
-    await cred.user.updateProfile({ displayName: displayName });
-
-    // Create user doc with role 'member' — Admin upgrades to 'admin' via Firestore Console
-    await db.collection('users').doc(cred.user.uid).set({
-      uid: cred.user.uid,
-      email: email,
-      displayName: displayName,
-      role: 'member',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    isApprovedAdmin = false;
-    alert(`✅ สมัครสำเร็จ!\nชื่อ: ${displayName}\nEmail: ${email}\n\nรอ Admin อนุมัติ role ก่อนจึงจะใช้งานได้`);
-    closeAuthModal();
-    updateAuthUI();
-    renderAll();
-  } catch(err) {
-    errDiv.textContent =
-      err.code === 'auth/email-already-in-use' ? 'Email นี้ถูกใช้งานแล้ว' :
-      err.code === 'auth/invalid-email' ? 'รูปแบบ email ไม่ถูกต้อง' :
-      err.code === 'auth/weak-password' ? 'รหัสผ่านต้องมีอย่างน้อย 6 ตัว' :
-      err.message;
-    errDiv.classList.remove('hidden');
-  }
+function copyUidToClipboard() {
+  const input = document.getElementById('userProfileUid');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    alert('📋 คัดลอก User ID เรียบร้อยแล้ว:\n' + input.value + '\n\nนำไปค้นหาใน Firestore คอลเลกชัน "users" เพื่อแก้ rule: "admin"');
+  }).catch(() => {
+    prompt('คัดลอก User ID ด้านล่างนี้:', input.value);
+  });
 }
 
 async function checkApprovalStatus() {
   if (!currentUser) return;
   await checkAdminApproval(currentUser.uid);
   if (isApprovedAdmin) {
-    alert('🎉 ได้รับสิทธิ์ Admin แล้ว!');
+    alert('🎉 บัญชีของคุณได้รับสิทธิ์ Admin เรียบร้อยแล้ว! แถบเครื่องมือผู้ดูแลพร้อมใช้งาน');
     closeAuthModal();
     updateAuthUI();
     renderAll();
   } else {
     const doc = await db.collection('users').doc(currentUser.uid).get();
-    const role = doc.exists ? doc.data().role : 'ไม่พบข้อมูล';
-    alert(`⏳ ยังไม่ได้รับสิทธิ์ Admin\nRole ปัจจุบัน: ${role}\n\nรอ Admin เปลี่ยน role เป็น "admin" ใน Firestore Console`);
+    const rule = doc.exists ? (doc.data().rule || doc.data().role || 'member') : 'ไม่พบข้อมูล';
+    alert(`⏳ สถานะ rule ปัจจุบัน: "${rule}"\n\nเจ้าของระบบสามารถเข้าไปที่ Firebase Console -> Firestore -> users/${currentUser.uid} แล้วเปลี่ยน rule เป็น "admin" ได้ตลอดเวลา`);
   }
 }
 
@@ -1256,22 +1308,22 @@ function renderDesktopTable(computed, totalPrice, totalCom, pw, pc) {
   }
 
   const adminFoot = (isAdmin) ? '<td class="table-cell-border bg-slate-200 admin-col whitespace-nowrap"></td>' : '';
-  const wCells = PLAYERS.map(p => `<td class="py-2 px-1.5 table-cell-border text-center font-bold bg-sky-100 whitespace-nowrap">${pw[p.id]>0?pw[p.id].toFixed(2):'-'}</td>`).join('');
-  const cCells = PLAYERS.map(p => `<td class="py-2 px-1.5 table-cell-border text-center font-bold bg-indigo-50 whitespace-nowrap">${pc[p.id]>0?pc[p.id].toFixed(2):'-'}</td>`).join('');
-  const gCells = PLAYERS.map(p => { const g=(pw[p.id]||0)+(pc[p.id]||0); return `<td class="py-2.5 px-1.5 table-cell-border text-center font-extrabold bg-emerald-400 text-slate-950 whitespace-nowrap">${g>0?g.toFixed(2):'-'}</td>`; }).join('');
+  const wCells = PLAYERS.map(p => `<td class="py-2 px-1.5 table-cell-border text-center font-bold bg-sky-100 text-sky-950 whitespace-nowrap">${pw[p.id]>0?pw[p.id].toFixed(2):'-'}</td>`).join('');
+  const cCells = PLAYERS.map(p => `<td class="py-2 px-1.5 table-cell-border text-center font-bold bg-indigo-50 text-indigo-950 whitespace-nowrap">${pc[p.id]>0?pc[p.id].toFixed(2):'-'}</td>`).join('');
+  const gCells = PLAYERS.map(p => { const g=(pw[p.id]||0)+(pc[p.id]||0); return `<td class="py-2.5 px-1.5 table-cell-border text-center font-black bg-[#5bc0de] text-slate-950 whitespace-nowrap">${g>0?g.toFixed(2):'-'}</td>`; }).join('');
 
   tfoot.innerHTML = `
-    <tr class="bg-sky-50 whitespace-nowrap"><td colspan="7" class="py-2 px-3 table-cell-border text-right font-bold text-slate-700 whitespace-nowrap">รวมค่าแรง:</td><td class="table-cell-border bg-slate-100 whitespace-nowrap">-</td>${wCells}<td class="table-cell-border bg-slate-100 whitespace-nowrap"></td><td class="py-2 px-3 table-cell-border text-right font-extrabold bg-sky-200 whitespace-nowrap">${fmt(totalPrice-totalCom)}</td>${adminFoot}</tr>
+    <tr class="bg-sky-50 whitespace-nowrap"><td colspan="7" class="py-2 px-3 table-cell-border text-right font-bold text-slate-700 whitespace-nowrap">รวมค่าแรง:</td><td class="table-cell-border bg-slate-100 whitespace-nowrap">-</td>${wCells}<td class="table-cell-border bg-slate-100 whitespace-nowrap"></td><td class="py-2 px-3 table-cell-border text-right font-extrabold bg-sky-200 text-sky-950 whitespace-nowrap">${fmt(totalPrice-totalCom)}</td>${adminFoot}</tr>
     <tr class="bg-indigo-50 whitespace-nowrap"><td colspan="7" class="py-2 px-3 table-cell-border text-right font-bold text-indigo-900 whitespace-nowrap">รวมคอม 10%:</td><td class="py-2 px-2.5 table-cell-border text-right font-extrabold text-indigo-700 bg-indigo-100 whitespace-nowrap">${fmt(totalCom)}</td>${cCells}<td class="table-cell-border bg-slate-100 whitespace-nowrap"></td><td class="py-2 px-3 table-cell-border text-right font-extrabold text-indigo-700 bg-indigo-100 whitespace-nowrap">${fmt(totalCom)}</td>${adminFoot}</tr>
-    <tr class="bg-emerald-500 text-slate-950 font-extrabold text-sm border-t-2 border-emerald-700 whitespace-nowrap">
-      <td class="py-2.5 px-2 table-cell-border text-white text-center whitespace-nowrap">23-Nov</td>
-      <td colspan="3" class="py-2.5 px-3 table-cell-border bg-slate-900 text-slate-100 text-left text-xs whitespace-nowrap">Grand Total</td>
-      <td class="py-2.5 px-3 table-cell-border text-right font-black whitespace-nowrap">${fmt(totalPrice)}</td>
-      <td colspan="2" class="py-2.5 px-3 table-cell-border bg-slate-900 text-slate-200 text-right text-xs whitespace-nowrap">สุทธิ:</td>
-      <td class="py-2.5 px-2.5 table-cell-border text-right bg-emerald-700 text-white font-black whitespace-nowrap">${fmt(totalCom)}</td>
+    <tr class="bg-slate-900 text-white font-extrabold text-sm border-t-2 border-sky-400 whitespace-nowrap">
+      <td class="py-2.5 px-2 table-cell-border bg-sky-700 text-white text-center whitespace-nowrap">23-Nov</td>
+      <td colspan="3" class="py-2.5 px-3 table-cell-border bg-slate-900 text-sky-200 text-left text-xs whitespace-nowrap">Grand Total</td>
+      <td class="py-2.5 px-3 table-cell-border text-right font-black text-amber-300 whitespace-nowrap">${fmt(totalPrice)}</td>
+      <td colspan="2" class="py-2.5 px-3 table-cell-border bg-slate-900 text-slate-300 text-right text-xs whitespace-nowrap">สุทธิ:</td>
+      <td class="py-2.5 px-2.5 table-cell-border text-right bg-indigo-900 text-indigo-200 font-black whitespace-nowrap">${fmt(totalCom)}</td>
       ${gCells}
-      <td class="table-cell-border bg-emerald-700 whitespace-nowrap"></td>
-      <td class="py-2.5 px-3 table-cell-border text-right font-black whitespace-nowrap">${fmt(totalPrice)}</td>
+      <td class="table-cell-border bg-slate-900 whitespace-nowrap"></td>
+      <td class="py-2.5 px-3 table-cell-border text-right font-black text-amber-300 bg-slate-950 whitespace-nowrap">${fmt(totalPrice)}</td>
       ${adminFoot}
     </tr>`;
 }
@@ -1331,19 +1383,28 @@ function renderMobileCards(computed, totalPrice, totalCom, pw, pc) {
   // Mobile Summary
   const topPlayers = PLAYERS.filter(p => (pw[p.id]||0)+(pc[p.id]||0) > 0).sort((a,b) => ((pw[b.id]||0)+(pc[b.id]||0)) - ((pw[a.id]||0)+(pc[a.id]||0)));
   summaryEl.innerHTML = `
-    <div class="bg-emerald-500 rounded-xl p-3 shadow-sm text-white space-y-2">
-      <div class="flex items-center justify-between">
-        <span class="font-bold text-sm">🏆 สรุปยอดสุทธิรายสัปดาห์</span>
-        <span class="font-extrabold text-lg">฿${fmt(totalPrice)}</span>
+    <div class="bg-gradient-to-br from-slate-900 via-sky-950 to-indigo-950 rounded-2xl p-4 shadow-lg text-white space-y-3 border border-sky-800/40">
+      <div class="flex items-center justify-between pb-2 border-b border-white/10">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🏆</span>
+          <div>
+            <h4 class="font-bold text-sm text-sky-100 leading-tight">สรุปยอดสุทธิรายสัปดาห์</h4>
+            <span class="text-[10px] text-sky-300">รวมค่าแรง + ค่าคอมมิสชั่น</span>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] text-slate-400 block leading-tight">ยอดรวมทั้งหมด</span>
+          <span class="font-black text-lg text-amber-300">฿${fmt(totalPrice)}</span>
+        </div>
       </div>
-      <div class="space-y-1">
-        ${topPlayers.map(p => {
+      <div class="space-y-2 pt-1">
+        ${topPlayers.length === 0 ? '<p class="text-xs text-slate-400 text-center py-2">ยังไม่มียอดในสัปดาห์นี้</p>' : topPlayers.map(p => {
           const g = (pw[p.id]||0) + (pc[p.id]||0);
-          const barW = Math.max(10, Math.min(100, (g / totalPrice) * 100 * 3));
+          const barW = totalPrice > 0 ? Math.max(10, Math.min(100, (g / totalPrice) * 100 * 2.5)) : 0;
           return `<div class="flex items-center gap-2 text-xs">
-            <span class="w-16 text-right font-semibold text-emerald-100 shrink-0">${p.name}</span>
-            <div class="flex-1 bg-emerald-700 rounded-full h-4 overflow-hidden">
-              <div class="bg-white/30 h-full rounded-full flex items-center pl-2 text-[10px] font-bold" style="width:${barW}%">฿${fmt(g)}</div>
+            <span class="w-20 text-right font-medium text-slate-200 truncate shrink-0">${p.name}</span>
+            <div class="flex-1 bg-white/10 rounded-full h-5 overflow-hidden p-0.5">
+              <div class="bg-gradient-to-r from-sky-400 to-emerald-400 h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-slate-950 transition-all duration-500" style="width:${barW}%">฿${fmt(g)}</div>
             </div>
           </div>`;
         }).join('')}
