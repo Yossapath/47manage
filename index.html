@@ -98,24 +98,24 @@
 </header>
 
 <!-- ========== ADMIN TOOLBAR (only visible when admin is approved & logged in) ========== -->
-<div id="adminToolbar" class="hidden bg-slate-900 text-white border-b border-slate-700">
+<div id="adminToolbar" class="hidden bg-blue-800 text-white border-b border-blue-900">
   <div class="w-full max-w-[99%] 2xl:max-w-[1920px] mx-auto px-2 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
-    <div class="flex items-center gap-2 text-xs text-slate-300">
-      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-      <span class="font-semibold text-emerald-400">โหมดแอดมิน</span>
+    <div class="flex items-center gap-2 text-xs text-blue-200">
+      <span class="w-2 h-2 rounded-full bg-green-400"></span>
+      <span class="font-semibold text-green-300">โหมดแอดมิน</span>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button onclick="openAddModal()" class="px-3 py-1.5 text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg shadow-sm transition touch-active flex items-center gap-1.5">
+      <button onclick="openAddModal()" class="px-3 py-1.5 text-xs font-semibold bg-green-500 hover:bg-green-400 text-white rounded-lg shadow-sm transition touch-active flex items-center gap-1.5">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         <span>+ เพิ่มรอบดันเจี้ยน</span>
       </button>
-      <button onclick="openPlayerModal()" class="px-2.5 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition touch-active flex items-center gap-1.5 shadow-sm">
+      <button onclick="openPlayerModal()" class="px-2.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition touch-active flex items-center gap-1.5 shadow-sm">
         <span>👥 จัดการคนงาน</span>
       </button>
-      <button onclick="clearAllRuns()" class="px-2.5 py-1.5 text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition touch-active flex items-center gap-1 shadow-sm">
+      <button onclick="clearAllRuns()" class="px-2.5 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition touch-active flex items-center gap-1 shadow-sm">
         <span>🗑️ เคลียร์ข้อมูลตาราง</span>
       </button>
-      <button onclick="openLogModal()" class="px-2.5 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition touch-active flex items-center gap-1 shadow-sm">
+      <button onclick="openLogModal()" class="px-2.5 py-1.5 text-xs font-medium bg-blue-900 hover:bg-blue-700 text-blue-200 rounded-lg transition touch-active flex items-center gap-1 shadow-sm">
         <span>📋 ดู Log</span>
       </button>
     </div>
@@ -216,35 +216,35 @@
 
   <!-- SPREADSHEET TABLE (Horizontal Scroll on mobile, Fullscreen Responsive on PC) -->
   <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden block" id="spreadsheetTableWrap">
-    <div class="bg-[#5bc0de] text-white py-2 px-4 text-center font-bold text-sm sm:text-base flex items-center justify-between whitespace-nowrap">
+    <div class="bg-blue-700 text-white py-2 px-4 text-center font-bold text-sm sm:text-base flex items-center justify-between whitespace-nowrap">
       <span></span>
       <span>สรุปค่าตอบแทน บริษัท สี่เจ็ดเช็ดหยั่ง จำกัด</span>
-      <span class="text-[10px] font-normal text-sky-100 flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>Realtime
+      <span class="text-[10px] font-normal text-blue-200 flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>Realtime
       </span>
     </div>
     <!-- Table Container: scrolls on mobile, full width on PC -->
     <div class="overflow-x-auto w-full touch-pan-x" style="-webkit-overflow-scrolling: touch;">
       <table class="w-full text-xs text-center border-collapse whitespace-nowrap" id="dungeonTable">
         <thead>
-          <tr class="bg-[#5bc0de] text-slate-900 font-bold border-b border-sky-400 whitespace-nowrap text-[11px] xl:text-xs">
-            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Payment</th>
-            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Date</th>
-            <th rowspan="2" class="py-2 px-1 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Time</th>
-            <th rowspan="2" class="py-2 px-2 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">CTM</th>
-            <th rowspan="2" class="py-2 px-2 table-cell-border bg-sky-200/90 font-bold text-right whitespace-nowrap">Price</th>
-            <th rowspan="2" class="py-2 px-2.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Detail</th>
-            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-200/90 font-semibold whitespace-nowrap">Sale by</th>
-            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-sky-300/90 font-bold text-right whitespace-nowrap">Com 10%</th>
-            <th colspan="11" id="playerGroupHeader" class="py-1 px-2 table-cell-border bg-sky-200 tracking-wider uppercase font-extrabold text-[10px] xl:text-[11px] whitespace-nowrap">PLAYER (ทีมแบก - ค่าแรงหารเท่า)</th>
-            <th rowspan="2" class="py-2 px-1.5 table-cell-border bg-indigo-100 text-indigo-950 font-semibold whitespace-nowrap">สลิป</th>
-            <th rowspan="2" class="py-2 px-2 table-cell-border bg-sky-200/90 font-bold text-right whitespace-nowrap">Total</th>
-            <th rowspan="2" class="admin-col py-2 px-1.5 table-cell-border bg-slate-200 font-semibold whitespace-nowrap">จัดการ</th>
+          <tr class="bg-blue-700 text-white font-bold border-b border-blue-900 whitespace-nowrap text-[11px] xl:text-xs">
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-semibold whitespace-nowrap">Payment</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-semibold whitespace-nowrap">Date</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-semibold whitespace-nowrap">Time</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-semibold whitespace-nowrap">CTM</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-bold text-right whitespace-nowrap">Price</th>
+            <th rowspan="2" class="py-2.5 px-2.5 table-cell-border bg-blue-800 font-semibold whitespace-nowrap">Detail</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-semibold whitespace-nowrap">Sale by</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-900 font-bold text-right whitespace-nowrap">Com 10%</th>
+            <th colspan="11" id="playerGroupHeader" class="py-1.5 px-2 table-cell-border bg-blue-600 tracking-wider uppercase font-extrabold text-[10px] xl:text-[11px] whitespace-nowrap">PLAYER (ทีมแบก - ค่าแรงหารเท่า)</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-semibold whitespace-nowrap">สลิป</th>
+            <th rowspan="2" class="py-2.5 px-2 table-cell-border bg-blue-800 font-bold text-right whitespace-nowrap">Total</th>
+            <th rowspan="2" class="admin-col py-2.5 px-2 table-cell-border bg-blue-900 font-semibold whitespace-nowrap">จัดการ</th>
           </tr>
-          <tr class="bg-sky-100 text-slate-800 font-semibold text-[11px] whitespace-nowrap" id="playerHeaderRow"></tr>
+          <tr class="bg-blue-100 text-blue-900 font-semibold text-[11px] whitespace-nowrap" id="playerHeaderRow"></tr>
         </thead>
         <tbody id="tableBody" class="divide-y divide-slate-200 font-medium"></tbody>
-        <tfoot id="tableFoot" class="font-bold border-t-2 border-slate-400"></tfoot>
+        <tfoot id="tableFoot" class="font-bold border-t-2 border-blue-400"></tfoot>
       </table>
     </div>
   </div>
@@ -364,23 +364,26 @@
 <!-- Slip Lightbox Modal -->
 <div id="slipModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
   <div class="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-fade-up">
-    <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+    <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-blue-700">
       <div class="min-w-0">
-        <h3 class="font-bold text-slate-800 text-xs flex items-center gap-1.5 truncate">🧾 <span id="modalSlipTitle">สลิปลูกค้า</span></h3>
-        <p class="text-[11px] text-slate-500 truncate" id="modalSlipSubtext"></p>
+        <h3 class="font-bold text-white text-xs flex items-center gap-1.5 truncate">🧾 <span id="modalSlipTitle">สลิปลูกค้า</span></h3>
+        <p class="text-[11px] text-blue-200 truncate" id="modalSlipSubtext"></p>
       </div>
-      <button onclick="closeSlipModal()" class="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition shrink-0">✕</button>
+      <button onclick="closeSlipModal()" class="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition shrink-0">✕</button>
     </div>
-    <div class="bg-slate-900 flex items-center justify-center p-3" style="min-height:200px; max-height:70vh; overflow:auto;">
-      <img id="modalSlipImage" src="" alt="Payment Slip" class="max-w-full object-contain rounded-lg shadow-md" style="max-height:65vh;">
+    <div class="bg-slate-50 flex items-center justify-center p-3 border-b border-slate-200" style="min-height:200px; max-height:65vh; overflow:auto;">
+      <img id="modalSlipImage" src="" alt="Payment Slip" class="max-w-full object-contain rounded-lg shadow-md" style="max-height:60vh;">
       <div id="modalSlipEmpty" class="hidden text-center text-slate-400 py-8">
-        <svg class="w-10 h-10 mx-auto text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <svg class="w-10 h-10 mx-auto text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         <p class="text-sm">ยังไม่มีรูปสลิป</p>
       </div>
     </div>
-    <div class="p-2.5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs">
-      <span class="text-slate-500" id="modalSlipAmount"></span>
-      <button onclick="closeSlipModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition touch-active">ปิด</button>
+    <div class="p-2.5 bg-white border-t border-slate-100 flex justify-between items-center gap-2 text-xs flex-wrap">
+      <span class="text-slate-600 font-semibold" id="modalSlipAmount"></span>
+      <div class="flex items-center gap-1.5" id="slipModalAdminActions">
+        <!-- Admin-only slip actions injected by JS -->
+      </div>
+      <button onclick="closeSlipModal()" class="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-medium transition touch-active">ปิด</button>
     </div>
   </div>
 </div>
@@ -388,10 +391,10 @@
 <!-- Add Run Modal (Admin Only) -->
 <div id="addModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center overflow-y-auto">
   <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-fade-up" style="max-height:95vh; overflow-y:auto;">
-    <div class="p-3 sm:p-5 bg-gradient-to-r from-sky-500 to-indigo-600 text-white flex items-center justify-between sticky top-0 z-10">
+    <div class="p-3 sm:p-5 bg-blue-700 text-white flex items-center justify-between sticky top-0 z-10">
       <div>
         <h3 class="font-bold text-sm sm:text-lg" id="modalFormTitle">✨ เพิ่มรอบดันเจี้ยน</h3>
-        <p class="text-[10px] sm:text-xs text-sky-100">บันทึกตรงสู่ Firebase Cloud Firestore</p>
+        <p class="text-[10px] sm:text-xs text-blue-200">บันทึกตรงสู่ Firebase Cloud Firestore</p>
       </div>
       <button onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition text-sm">✕</button>
     </div>
@@ -479,7 +482,7 @@
       <!-- Form Footer -->
       <div class="pt-2 border-t border-slate-200 flex gap-2">
         <button type="button" onclick="closeAddModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition touch-active text-sm">ยกเลิก</button>
-        <button type="submit" id="btnSubmitRun" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow transition touch-active flex items-center justify-center gap-1.5 text-sm">
+        <button type="submit" id="btnSubmitRun" class="flex-1 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold shadow transition touch-active flex items-center justify-center gap-1.5 text-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
           บันทึก
         </button>
@@ -1281,49 +1284,54 @@ function renderDesktopTable(computed, totalPrice, totalCom, pw, pc) {
     const pCells = PLAYERS.map(p => {
       const a = r.playerSplits && Number(r.playerSplits[p.id]);
       const sel = selectedPlayerFilter === p.id;
-      return `<td class="py-2 px-1.5 table-cell-border text-center whitespace-nowrap ${sel?'bg-amber-100 font-bold text-amber-900':''}">${a>0?a.toFixed(2):'<span class="text-slate-300">-</span>'}</td>`;
+      return `<td class="py-2.5 px-2 table-cell-border text-center whitespace-nowrap text-xs ${sel?'bg-blue-100 font-bold text-blue-900':''}">${a>0?a.toFixed(2):'<span class="text-slate-300">-</span>'}</td>`;
     }).join('');
 
     const slip = r.slipUrl
-      ? `<button onclick="viewSlip('${r.id}')" class="text-emerald-700 hover:text-emerald-900 text-xs font-semibold underline whitespace-nowrap">ดูสลิป</button>`
+      ? `<button onclick="viewSlip('${r.id}')" class="text-blue-700 hover:text-blue-900 text-xs font-semibold underline whitespace-nowrap">ดูสลิป</button>`
       : `<span class="text-slate-300 text-xs">-</span>`;
 
-    const adminCell = isAdmin ? `<td class="py-1 px-1 table-cell-border text-center admin-col whitespace-nowrap"><button onclick="deleteRun('${r.id}')" class="text-rose-500 hover:text-rose-700 p-1" title="ลบ"><svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>` : '';
+    const adminCell = isAdmin ? `<td class="py-1.5 px-2 table-cell-border text-center admin-col whitespace-nowrap">
+      <div class="flex items-center justify-center gap-1">
+        <button onclick="openEditRunModal('${r.id}')" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-semibold whitespace-nowrap touch-active" title="แก้ไข">✏️ แก้ไข</button>
+        <button onclick="deleteRun('${r.id}')" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-[10px] font-semibold whitespace-nowrap touch-active" title="ลบ">🗑️</button>
+      </div>
+    </td>` : '';
 
     return `<tr class="${cls} transition-colors whitespace-nowrap">
-      <td class="py-2 px-2.5 table-cell-border text-slate-600 whitespace-nowrap">${r.paymentDate||''}</td>
-      <td class="py-2 px-2.5 table-cell-border text-slate-600 whitespace-nowrap">${r.date}</td>
-      <td class="py-2 px-2 table-cell-border text-slate-500 text-[11px] whitespace-nowrap">${r.time}</td>
-      <td class="py-2 px-3 table-cell-border font-medium whitespace-nowrap">${r.customer}</td>
-      <td class="py-2 px-3 table-cell-border text-right font-bold whitespace-nowrap">${r.price.toFixed(2)}</td>
-      <td class="py-2 px-3 table-cell-border text-left font-medium whitespace-nowrap">${r.detail}</td>
-      <td class="py-2 px-2.5 table-cell-border font-semibold text-indigo-700 whitespace-nowrap">${r.saleBy}</td>
-      <td class="py-2 px-2.5 table-cell-border text-right font-bold text-indigo-600 whitespace-nowrap">${r.com.toFixed(2)}</td>
+      <td class="py-2.5 px-2.5 table-cell-border text-slate-600 whitespace-nowrap text-xs">${r.paymentDate||''}</td>
+      <td class="py-2.5 px-2.5 table-cell-border text-slate-600 whitespace-nowrap text-xs">${r.date}</td>
+      <td class="py-2.5 px-2 table-cell-border text-slate-500 text-xs whitespace-nowrap">${r.time}</td>
+      <td class="py-2.5 px-3 table-cell-border font-medium whitespace-nowrap text-xs">${r.customer}</td>
+      <td class="py-2.5 px-3 table-cell-border text-right font-bold whitespace-nowrap text-xs">${r.price.toFixed(2)}</td>
+      <td class="py-2.5 px-3 table-cell-border text-left font-medium whitespace-nowrap text-xs">${r.detail}</td>
+      <td class="py-2.5 px-2.5 table-cell-border font-semibold text-blue-700 whitespace-nowrap text-xs">${r.saleBy}</td>
+      <td class="py-2.5 px-2.5 table-cell-border text-right font-bold text-blue-800 whitespace-nowrap text-xs">${r.com.toFixed(2)}</td>
       ${pCells}
-      <td class="py-2 px-2 table-cell-border text-center whitespace-nowrap">${slip}</td>
-      <td class="py-2 px-3 table-cell-border text-right font-bold whitespace-nowrap">${r.price.toFixed(2)}</td>
+      <td class="py-2.5 px-2 table-cell-border text-center whitespace-nowrap">${slip}</td>
+      <td class="py-2.5 px-3 table-cell-border text-right font-bold whitespace-nowrap text-xs">${r.price.toFixed(2)}</td>
       ${adminCell}
     </tr>`;
   }).join('');
   }
 
-  const adminFoot = (isAdmin) ? '<td class="table-cell-border bg-slate-200 admin-col whitespace-nowrap"></td>' : '';
-  const wCells = PLAYERS.map(p => `<td class="py-2 px-1.5 table-cell-border text-center font-bold bg-sky-100 text-sky-950 whitespace-nowrap">${pw[p.id]>0?pw[p.id].toFixed(2):'-'}</td>`).join('');
-  const cCells = PLAYERS.map(p => `<td class="py-2 px-1.5 table-cell-border text-center font-bold bg-indigo-50 text-indigo-950 whitespace-nowrap">${pc[p.id]>0?pc[p.id].toFixed(2):'-'}</td>`).join('');
-  const gCells = PLAYERS.map(p => { const g=(pw[p.id]||0)+(pc[p.id]||0); return `<td class="py-2.5 px-1.5 table-cell-border text-center font-black bg-[#5bc0de] text-slate-950 whitespace-nowrap">${g>0?g.toFixed(2):'-'}</td>`; }).join('');
+  const adminFoot = (isAdmin) ? '<td class="table-cell-border bg-blue-900 admin-col whitespace-nowrap"></td>' : '';
+  const wCells = PLAYERS.map(p => `<td class="py-2.5 px-2 table-cell-border text-center font-bold bg-blue-50 text-blue-900 whitespace-nowrap text-xs">${pw[p.id]>0?pw[p.id].toFixed(2):'-'}</td>`).join('');
+  const cCells = PLAYERS.map(p => `<td class="py-2.5 px-2 table-cell-border text-center font-bold bg-blue-100 text-blue-950 whitespace-nowrap text-xs">${pc[p.id]>0?pc[p.id].toFixed(2):'-'}</td>`).join('');
+  const gCells = PLAYERS.map(p => { const g=(pw[p.id]||0)+(pc[p.id]||0); return `<td class="py-3 px-2 table-cell-border text-center font-black bg-blue-700 text-white whitespace-nowrap text-xs">${g>0?g.toFixed(2):'-'}</td>`; }).join('');
 
   tfoot.innerHTML = `
-    <tr class="bg-sky-50 whitespace-nowrap"><td colspan="7" class="py-2 px-3 table-cell-border text-right font-bold text-slate-700 whitespace-nowrap">รวมค่าแรง:</td><td class="table-cell-border bg-slate-100 whitespace-nowrap">-</td>${wCells}<td class="table-cell-border bg-slate-100 whitespace-nowrap"></td><td class="py-2 px-3 table-cell-border text-right font-extrabold bg-sky-200 text-sky-950 whitespace-nowrap">${fmt(totalPrice-totalCom)}</td>${adminFoot}</tr>
-    <tr class="bg-indigo-50 whitespace-nowrap"><td colspan="7" class="py-2 px-3 table-cell-border text-right font-bold text-indigo-900 whitespace-nowrap">รวมคอม 10%:</td><td class="py-2 px-2.5 table-cell-border text-right font-extrabold text-indigo-700 bg-indigo-100 whitespace-nowrap">${fmt(totalCom)}</td>${cCells}<td class="table-cell-border bg-slate-100 whitespace-nowrap"></td><td class="py-2 px-3 table-cell-border text-right font-extrabold text-indigo-700 bg-indigo-100 whitespace-nowrap">${fmt(totalCom)}</td>${adminFoot}</tr>
-    <tr class="bg-slate-900 text-white font-extrabold text-sm border-t-2 border-sky-400 whitespace-nowrap">
-      <td class="py-2.5 px-2 table-cell-border bg-sky-700 text-white text-center whitespace-nowrap">23-Nov</td>
-      <td colspan="3" class="py-2.5 px-3 table-cell-border bg-slate-900 text-sky-200 text-left text-xs whitespace-nowrap">Grand Total</td>
-      <td class="py-2.5 px-3 table-cell-border text-right font-black text-amber-300 whitespace-nowrap">${fmt(totalPrice)}</td>
-      <td colspan="2" class="py-2.5 px-3 table-cell-border bg-slate-900 text-slate-300 text-right text-xs whitespace-nowrap">สุทธิ:</td>
-      <td class="py-2.5 px-2.5 table-cell-border text-right bg-indigo-900 text-indigo-200 font-black whitespace-nowrap">${fmt(totalCom)}</td>
+    <tr class="bg-blue-50 whitespace-nowrap"><td colspan="7" class="py-2.5 px-3 table-cell-border text-right font-bold text-blue-900 whitespace-nowrap text-xs">รวมค่าแรง:</td><td class="table-cell-border bg-blue-100 whitespace-nowrap">-</td>${wCells}<td class="table-cell-border bg-blue-50 whitespace-nowrap"></td><td class="py-2.5 px-3 table-cell-border text-right font-extrabold bg-blue-200 text-blue-950 whitespace-nowrap text-xs">${fmt(totalPrice-totalCom)}</td>${adminFoot}</tr>
+    <tr class="bg-blue-100 whitespace-nowrap"><td colspan="7" class="py-2.5 px-3 table-cell-border text-right font-bold text-blue-900 whitespace-nowrap text-xs">รวมคอม 10%:</td><td class="py-2.5 px-2.5 table-cell-border text-right font-extrabold text-blue-800 bg-blue-200 whitespace-nowrap text-xs">${fmt(totalCom)}</td>${cCells}<td class="table-cell-border bg-blue-50 whitespace-nowrap"></td><td class="py-2.5 px-3 table-cell-border text-right font-extrabold text-blue-800 bg-blue-200 whitespace-nowrap text-xs">${fmt(totalCom)}</td>${adminFoot}</tr>
+    <tr class="bg-blue-800 text-white font-extrabold text-sm border-t-2 border-blue-400 whitespace-nowrap">
+      <td class="py-3 px-2 table-cell-border bg-blue-900 text-white text-center whitespace-nowrap text-xs">23-Nov</td>
+      <td colspan="3" class="py-3 px-3 table-cell-border bg-blue-800 text-blue-100 text-left text-xs whitespace-nowrap">Grand Total</td>
+      <td class="py-3 px-3 table-cell-border text-right font-black text-white whitespace-nowrap text-xs">${fmt(totalPrice)}</td>
+      <td colspan="2" class="py-3 px-3 table-cell-border bg-blue-800 text-blue-200 text-right text-xs whitespace-nowrap">สุทธิ:</td>
+      <td class="py-3 px-2.5 table-cell-border text-right bg-blue-900 text-white font-black whitespace-nowrap text-xs">${fmt(totalCom)}</td>
       ${gCells}
-      <td class="table-cell-border bg-slate-900 whitespace-nowrap"></td>
-      <td class="py-2.5 px-3 table-cell-border text-right font-black text-amber-300 bg-slate-950 whitespace-nowrap">${fmt(totalPrice)}</td>
+      <td class="table-cell-border bg-blue-800 whitespace-nowrap"></td>
+      <td class="py-3 px-3 table-cell-border text-right font-black text-white bg-blue-900 whitespace-nowrap text-xs">${fmt(totalPrice)}</td>
       ${adminFoot}
     </tr>`;
 }
@@ -1435,6 +1443,40 @@ function openAddModal() {
   updateLiveCalc();
   document.getElementById('addModal').classList.remove('hidden');
 }
+
+function openEditRunModal(id) {
+  const r = runs.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('modalFormTitle').textContent = '✏️ แก้ไขรอบดันเจี้ยน';
+  document.getElementById('editRunId').value = id;
+  document.getElementById('inputDate').value = r.date || '23-Nov';
+  if (document.getElementById('inputTime')) document.getElementById('inputTime').value = r.time || '21:00';
+  document.getElementById('inputCustomer').value = r.customer || '';
+  document.getElementById('inputDetail').value = r.detail || '';
+  document.getElementById('inputPrice').value = r.price || '';
+  // SaleBy
+  setTimeout(() => {
+    const sel = document.getElementById('selectSaleBy');
+    if (sel) sel.value = r.saleBy || '';
+  }, 50);
+  // Carry players
+  document.querySelectorAll('input[name="carryPlayer"]').forEach(cb => {
+    cb.checked = r.carryPlayers && r.carryPlayers.includes(cb.value);
+  });
+  // Slip preview
+  if (r.slipUrl) {
+    currentSlipBase64 = r.slipUrl;
+    document.getElementById('slipPreviewThumb').src = r.slipUrl;
+    document.getElementById('slipPreviewContainer').classList.remove('hidden');
+    document.getElementById('btnRemoveSlip').classList.remove('hidden');
+    document.getElementById('slipFileName').textContent = 'สลิปปัจจุบัน';
+  } else {
+    removeSlip();
+  }
+  updateLiveCalc();
+  document.getElementById('addModal').classList.remove('hidden');
+}
+
 function closeAddModal() { document.getElementById('addModal').classList.add('hidden'); }
 
 async function handleSaveRun(e) {
@@ -1450,8 +1492,10 @@ async function handleSaveRun(e) {
   const share = (price - com) / carry.length;
   const splits = {}; carry.forEach(id => splits[id] = share);
 
+  const editId = document.getElementById('editRunId').value;
+  const isEdit = !!editId;
+
   const data = {
-    order: runs.length + 1,
     paymentDate: '23-Nov',
     date: document.getElementById('inputDate').value,
     time: document.getElementById('inputTime').value,
@@ -1465,10 +1509,22 @@ async function handleSaveRun(e) {
   btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...';
   try {
     if (isFirebaseReady) {
-      const docRef = await db.collection("runs").add({...data, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
-      await writeLog('ADD_RUN', `เพิ่มรอบ: ${data.detail} | ฿${data.price} | ลูกค้า: ${data.customer} | id: ${docRef.id}`);
+      if (isEdit) {
+        await db.collection("runs").doc(editId).update({...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp()});
+        await writeLog('EDIT_RUN', `แก้ไขรอบ: ${data.detail} | ฿${data.price} | ลูกค้า: ${data.customer} | id: ${editId}`);
+      } else {
+        data.order = runs.length + 1;
+        const docRef = await db.collection("runs").add({...data, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+        await writeLog('ADD_RUN', `เพิ่มรอบ: ${data.detail} | ฿${data.price} | ลูกค้า: ${data.customer} | id: ${docRef.id}`);
+      }
     } else {
-      data.id = 'run-'+Date.now(); runs.push(data); saveLocal(); renderAll();
+      if (isEdit) {
+        const idx = runs.findIndex(x => x.id === editId);
+        if (idx !== -1) runs[idx] = {...runs[idx], ...data};
+      } else {
+        data.id = 'run-'+Date.now(); data.order = runs.length + 1; runs.push(data);
+      }
+      saveLocal(); renderAll();
     }
     closeAddModal();
   } catch(err) { alert('บันทึกไม่สำเร็จ: ' + err.message); }
@@ -1494,9 +1550,50 @@ function viewSlip(id) {
   const empty = document.getElementById('modalSlipEmpty');
   if (r.slipUrl) { img.src = r.slipUrl; img.classList.remove('hidden'); empty.classList.add('hidden'); }
   else { img.classList.add('hidden'); empty.classList.remove('hidden'); }
+  // Admin slip actions
+  const adminBox = document.getElementById('slipModalAdminActions');
+  if (adminBox) {
+    if (isApprovedAdmin && currentUser) {
+      adminBox.innerHTML = `
+        <label class="cursor-pointer px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 touch-active">
+          📷 เปลี่ยนสลิป
+          <input type="file" accept="image/*" class="hidden" onchange="handleSlipModalReplace(event,'${id}')">
+        </label>
+        ${r.slipUrl ? `<button onclick="deleteSlip('${id}')" class="px-2.5 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-[11px] font-semibold touch-active">🗑️ ลบสลิป</button>` : ''}`;
+    } else {
+      adminBox.innerHTML = '';
+    }
+  }
   document.getElementById('slipModal').classList.remove('hidden');
 }
 function closeSlipModal() { document.getElementById('slipModal').classList.add('hidden'); }
+
+async function handleSlipModalReplace(event, runId) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const base64 = ev.target.result;
+    try {
+      if (isFirebaseReady) {
+        await db.collection("runs").doc(runId).update({ slipUrl: base64, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await writeLog('EDIT_SLIP', `เปลี่ยนสลิป: id ${runId}`);
+      }
+      closeSlipModal();
+    } catch(e) { alert('อัปเดตสลิปไม่สำเร็จ: ' + e.message); }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function deleteSlip(runId) {
+  if (!confirm('ลบสลิปออกจากรายการนี้หรือไม่?')) return;
+  try {
+    if (isFirebaseReady) {
+      await db.collection("runs").doc(runId).update({ slipUrl: null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      await writeLog('DELETE_SLIP', `ลบสลิป: id ${runId}`);
+    }
+    closeSlipModal();
+  } catch(e) { alert('ลบสลิปไม่สำเร็จ: ' + e.message); }
+}
 
 // Init
 window.addEventListener('DOMContentLoaded', init);
