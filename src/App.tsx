@@ -71,6 +71,7 @@ type PaymentRow = {
   sale: number;
   players: string[];      // all players involved
   segments?: RunSegment[]; // if split across tiers with different players
+  splitCarry?: boolean;   // true = different players per tier
   commissionTo: string;
   slip?: string;
   createdAt?: any;
@@ -944,25 +945,35 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   };
 
   const openEdit = (row: PaymentRow) => {
-    setSelectedPlayers(row.players || []);
     setCurrentSlipBase64(row.slip || "");
     const tmpl = dungeonTemplates.find((t) => t.name === row.dungeon) || dungeonTemplates[0];
     setFormDungeonId(tmpl?.id || "");
     setFormDiffName(row.difficulty || "");
     setFormSaleOverride(row.sale);
 
+    // Use explicit splitCarry flag; fall back to old behaviour for legacy rows that lack the flag
+    const wasSplit = row.splitCarry === true;
+
     if (row.segments && row.segments.length > 0) {
-      setIsSplitCarry(true);
       const tiers: DungeonTier[] = row.segments.map((s) => ({ label: s.tierLabel, price: s.price }));
       setSelectedTiers(tiers);
-      const map: Record<string, string[]> = {};
-      row.segments.forEach((s) => {
-        map[s.tierLabel] = s.players;
-      });
-      setTierPlayerMap(map);
+      setIsSplitCarry(wasSplit);
+
+      if (wasSplit) {
+        // Restore per-tier player assignments
+        const map: Record<string, string[]> = {};
+        row.segments.forEach((s) => { map[s.tierLabel] = s.players; });
+        setTierPlayerMap(map);
+        setSelectedPlayers(row.players || []);
+      } else {
+        // Shared-carry: players array is the same for all tiers
+        setTierPlayerMap({});
+        setSelectedPlayers(row.players || []);
+      }
     } else {
       setIsSplitCarry(false);
       setTierPlayerMap({});
+      setSelectedPlayers(row.players || []);
       const diff = tmpl?.difficulties.find((d) => d.name === row.difficulty) || tmpl?.difficulties[0];
       const matchingTiers = diff?.tiers.filter((t) => row.tier.includes(t.label)) || [];
       setSelectedTiers(matchingTiers.length > 0 ? matchingTiers : diff?.tiers ? [...diff.tiers] : []);
@@ -1066,6 +1077,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
       players: finalPlayers,
       carryPlayers: finalPlayers,
       segments: segments,
+      splitCarry: isSplitCarry,
       slip: currentSlipBase64 || null,
       slipUrl: currentSlipBase64 || null,
       updatedAt: serverTimestamp(),
