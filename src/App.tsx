@@ -142,6 +142,16 @@ function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+// Format money with exact decimals (e.g. 67.5, 67.25, 300) without rounding away fractions!
+function formatMoney(amount: number | null | undefined): string {
+  if (amount === undefined || amount === null || isNaN(amount)) return "0";
+  const rounded = Math.round(amount * 100) / 100;
+  return rounded.toLocaleString("th-TH", {
+    minimumFractionDigits: rounded % 1 === 0 ? 0 : (rounded * 10) % 1 === 0 ? 1 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 // Robust player matching for commission and wage attribution
 function isPlayerMatch(player: Player, identifier: string): boolean {
   if (!identifier || !player) return false;
@@ -309,10 +319,15 @@ const icons = {
   info: <Icon size={16}><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></Icon>,
 };
 
-// ======================== LOGIN + REGISTER COMPONENT ========================
-function Login({ onLogin }: { onLogin: (role: Role, username: string) => void }) {
+// ======================== ADMIN AUTH MODAL ========================
+function AdminAuthModal({
+  onLogin,
+  onClose,
+}: {
+  onLogin: (username: string) => void;
+  onClose: () => void;
+}) {
   const [view, setView] = useState<AuthView>("login");
-  const [role, setRole] = useState<Role>("admin");
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -330,65 +345,41 @@ function Login({ onLogin }: { onLogin: (role: Role, username: string) => void })
     setErrorMsg("");
     setLoading(true);
 
-    if (role === "admin") {
-      if (!username.trim()) {
-        setErrorMsg("กรุณากรอกชื่อผู้ใช้");
-        setLoading(false);
-        return;
-      }
+    if (!username.trim()) {
+      setErrorMsg("กรุณากรอกชื่อผู้ใช้ Admin");
+      setLoading(false);
+      return;
+    }
 
-      // Try Firestore users collection first
-      try {
-        const snap = await getDocs(query(
+    // Try Firestore users collection
+    try {
+      const snap = await getDocs(
+        query(
           collection(db, "users"),
           where("username", "==", username.trim()),
           where("role", "==", "admin")
-        ));
-        if (!snap.empty) {
-          const userData = snap.docs[0].data();
-          if (userData.password === password) {
-            setLoading(false);
-            onLogin("admin", username.trim());
-            return;
-          }
+        )
+      );
+      if (!snap.empty) {
+        const userData = snap.docs[0].data();
+        if (userData.password === password) {
+          setLoading(false);
+          onLogin(username.trim());
+          return;
         }
-      } catch (_) { /* fallback below */ }
-
-      // Fallback: hardcoded passwords
-      const savedAdminPass = localStorage.getItem("47manage_admin_pass") || "admin";
-      if (password === savedAdminPass || password === "47family" || password === "admin") {
-        setLoading(false);
-        onLogin("admin", username.trim());
-      } else {
-        setErrorMsg("รหัสผ่านไม่ถูกต้อง");
-        setLoading(false);
       }
-    } else {
-      // Member login — check Firestore users collection
-      try {
-        const snap = await getDocs(query(
-          collection(db, "users"),
-          where("username", "==", username.trim())
-        ));
-        if (!snap.empty) {
-          const userData = snap.docs[0].data();
-          if (userData.password === password) {
-            const memberRole = userData.role as Role;
-            setLoading(false);
-            onLogin(memberRole, username.trim());
-            return;
-          } else {
-            setErrorMsg("รหัสผ่านไม่ถูกต้อง");
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (_) { /* fall through */ }
+    } catch (_) {
+      /* fallback below */
+    }
 
-      // Allow view-only without password
-      const memberName = username.trim() || "สมาชิกทั่วไป";
+    // Fallback: hardcoded passwords
+    const savedAdminPass = localStorage.getItem("47manage_admin_pass") || "admin";
+    if (password === savedAdminPass || password === "47family" || password === "admin") {
       setLoading(false);
-      onLogin("member", memberName);
+      onLogin(username.trim());
+    } else {
+      setErrorMsg("รหัสผ่านไม่ถูกต้อง");
+      setLoading(false);
     }
   };
 
@@ -397,17 +388,25 @@ function Login({ onLogin }: { onLogin: (role: Role, username: string) => void })
     setErrorMsg("");
     setSuccessMsg("");
 
-    if (!regUsername.trim()) { setErrorMsg("กรุณากรอกชื่อผู้ใช้"); return; }
-    if (regPassword.length < 4) { setErrorMsg("รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร"); return; }
-    if (regPassword !== regConfirm) { setErrorMsg("รหัสผ่านไม่ตรงกัน"); return; }
+    if (!regUsername.trim()) {
+      setErrorMsg("กรุณากรอกชื่อผู้ใช้");
+      return;
+    }
+    if (regPassword.length < 4) {
+      setErrorMsg("รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร");
+      return;
+    }
+    if (regPassword !== regConfirm) {
+      setErrorMsg("รหัสผ่านไม่ตรงกัน");
+      return;
+    }
 
     setLoading(true);
     try {
       // Check if username already exists
-      const existing = await getDocs(query(
-        collection(db, "users"),
-        where("username", "==", regUsername.trim())
-      ));
+      const existing = await getDocs(
+        query(collection(db, "users"), where("username", "==", regUsername.trim()))
+      );
       if (!existing.empty) {
         setErrorMsg("ชื่อผู้ใช้นี้มีอยู่แล้ว กรุณาเลือกชื่ออื่น");
         setLoading(false);
@@ -417,14 +416,20 @@ function Login({ onLogin }: { onLogin: (role: Role, username: string) => void })
       await addDoc(collection(db, "users"), {
         username: regUsername.trim(),
         password: regPassword,
-        role: "member",
-        createdAt: serverTimestamp()
+        role: "admin",
+        createdAt: serverTimestamp(),
       });
 
-      setSuccessMsg(`สมัครสำเร็จ! บัญชี "${regUsername.trim()}" ได้รับยศ Member แล้ว กรุณาเข้าสู่ระบบ`);
-      setRegUsername(""); setRegPassword(""); setRegConfirm("");
+      setSuccessMsg(`สมัครบัญชี Admin สำเร็จ! "${regUsername.trim()}" สามารถเข้าสู่ระบบได้ทันที`);
+      setRegUsername("");
+      setRegPassword("");
+      setRegConfirm("");
       setLoading(false);
-      setTimeout(() => { setView("login"); setSuccessMsg(""); }, 2500);
+      setTimeout(() => {
+        setView("login");
+        setUsername(regUsername.trim());
+        setSuccessMsg("");
+      }, 1500);
     } catch (err: any) {
       setErrorMsg("สมัครไม่สำเร็จ: " + err.message);
       setLoading(false);
@@ -432,111 +437,193 @@ function Login({ onLogin }: { onLogin: (role: Role, username: string) => void })
   };
 
   return (
-    <main className="login-page">
-      <div className="login-brand">
-        <div className="brand-mark"><span>47</span></div>
-        <div><strong>47RAVENGE</strong><small>Reward Management</small></div>
-      </div>
-      <section className="login-card">
-        <div className="login-heading">
-          <span className="eyebrow">ระบบจัดการกิลด์</span>
-          <h1>{view === "login" ? <>เข้าสู่ระบบจัดการ<br />ค่าตอบแทน</> : <>สมัครสมาชิก<br />ใหม่</>}</h1>
-          <p>{view === "login" ? "ตรวจสอบและจัดการรายได้ของทีมอย่างโปร่งใส" : "สร้างบัญชีใหม่เพื่อเข้าดูข้อมูลรายได้ทีม"}</p>
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div
+        className="modal"
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{ width: "420px", maxWidth: "92vw" }}
+      >
+        <button type="button" className="modal-close" onClick={onClose} title="ปิด">
+          ×
+        </button>
+        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              background: "#edf5fd",
+              color: "#176bca",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "24px",
+              margin: "0 auto 10px auto",
+            }}
+          >
+            🛡️
+          </div>
+          <span className="eyebrow" style={{ color: "#176bca" }}>เฉพาะผู้ดูแลระบบ (Admin Only)</span>
+          <h2 style={{ margin: "4px 0 6px 0", fontSize: "20px" }}>
+            {view === "login" ? "เข้าสู่ระบบ Admin" : "สมัครบัญชี Admin ใหม่"}
+          </h2>
+          <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>
+            {view === "login"
+              ? "ระบบจัดการและบันทึกข้อมูลกิลด์ 47Ravenge"
+              : "สร้างบัญชีผู้ดูแลระบบเพื่อเข้าจัดการข้อมูล"}
+          </p>
         </div>
 
-        {/* Login / Register Tab */}
+        {/* Tab switch */}
         <div className="role-switch" style={{ marginBottom: "16px" }}>
-          <button type="button" className={view === "login" ? "active" : ""} onClick={() => { setView("login"); setErrorMsg(""); setSuccessMsg(""); }}>
-            เข้าสู่ระบบ
+          <button
+            type="button"
+            className={view === "login" ? "active" : ""}
+            onClick={() => {
+              setView("login");
+              setErrorMsg("");
+              setSuccessMsg("");
+            }}
+          >
+            🔐 เข้าสู่ระบบ Admin
           </button>
-          <button type="button" className={view === "register" ? "active" : ""} onClick={() => { setView("register"); setErrorMsg(""); setSuccessMsg(""); }}>
-            สมัครสมาชิก
+          <button
+            type="button"
+            className={view === "register" ? "active" : ""}
+            onClick={() => {
+              setView("register");
+              setErrorMsg("");
+              setSuccessMsg("");
+            }}
+          >
+            ✍️ สมัครบัญชี Admin
           </button>
         </div>
 
         {view === "login" ? (
-          <>
-            <div className="role-switch">
-              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => { setRole("admin"); setUsername("admin"); setErrorMsg(""); }}>
-                ผู้ดูแลระบบ (Admin)
-              </button>
-              <button type="button" className={role === "member" ? "active" : ""} onClick={() => { setRole("member"); setUsername(""); setErrorMsg(""); }}>
-                สมาชิก (Member)
-              </button>
-            </div>
-
-            <form onSubmit={handleLogin}>
-              <label className="field">
-                <span>{role === "admin" ? "ชื่อผู้ใช้ (Username)" : "ชื่อผู้ใช้ (หรือปล่อยว่าง)"}</span>
-                <input
-                  type="text"
-                  required={role === "admin"}
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={role === "admin" ? "เช่น admin" : "ชื่อสมาชิก"}
-                />
-              </label>
-
-              <label className="field">
-                <span>รหัสผ่าน (Password){role === "member" ? " (ถ้ามี)" : ""}</span>
-                <div className="password-wrap">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required={role === "admin"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="กรอกรหัสผ่าน"
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)}>
-                    {showPassword ? "ซ่อน" : "แสดง"}
-                  </button>
-                </div>
-              </label>
-
-              {errorMsg && <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>⚠️ {errorMsg}</p>}
-
-              <button type="submit" className="login-button" disabled={loading}>
-                {loading ? "กำลังตรวจสอบ..." : role === "admin" ? "เข้าสู่ระบบผู้ดูแล" : "เข้าใช้งาน"}
-                {!loading && <span>{icons.chevron}</span>}
-              </button>
-            </form>
-            <p className="demo-note">
-              {role === "admin"
-                ? "💡 บัญชีผู้ดูแล: รหัสเริ่มต้นคือ admin หรือ 47family"
-                : "👀 สมัครแล้วจะได้ยศ Member · ติดต่อ Admin เพื่ออัปเกรด"}
-            </p>
-          </>
-        ) : (
-          <form onSubmit={handleRegister}>
+          <form onSubmit={handleLogin}>
             <label className="field">
-              <span>ชื่อผู้ใช้ (Username)</span>
-              <input required autoFocus value={regUsername} onChange={(e) => setRegUsername(e.target.value)} placeholder="เช่น K.Arm หรือ newnick" />
+              <span>ชื่อผู้ใช้ Admin (Username)</span>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="เช่น admin"
+              />
             </label>
+
             <label className="field">
               <span>รหัสผ่าน (Password)</span>
               <div className="password-wrap">
-                <input type={showPassword ? "text" : "password"} required value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="อย่างน้อย 4 ตัวอักษร" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "ซ่อน" : "แสดง"}</button>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="กรอกรหัสผ่าน Admin"
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? "ซ่อน" : "แสดง"}
+                </button>
               </div>
             </label>
+
+            {errorMsg && (
+              <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>
+                ⚠️ {errorMsg}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={loading}
+              style={{ width: "100%", height: "42px", fontSize: "14px", marginTop: "8px" }}
+            >
+              {loading ? "กำลังตรวจสอบ..." : "เข้าสู่ระบบผู้ดูแล"}
+            </button>
+
+            <p style={{ fontSize: "11px", color: "#94a3b8", textAlign: "center", marginTop: "12px", lineHeight: "1.5" }}>
+              💡 รหัสเริ่มต้นคือ <code>admin</code> หรือ <code>47family</code><br />
+              สมาชิกทั่วไปสามารถปิดหน้านี้เพื่อเข้าเยี่ยมชมได้ทันที
+            </p>
+          </form>
+        ) : (
+          <form onSubmit={handleRegister}>
             <label className="field">
-              <span>ยืนยันรหัสผ่าน</span>
-              <input type={showPassword ? "text" : "password"} required value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)} placeholder="กรอกรหัสผ่านอีกครั้ง" />
+              <span>ชื่อผู้ใช้ Admin ใหม่ (Username)</span>
+              <input
+                required
+                autoFocus
+                value={regUsername}
+                onChange={(e) => setRegUsername(e.target.value)}
+                placeholder="เช่น Admin_Arm"
+              />
             </label>
 
-            {errorMsg && <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>⚠️ {errorMsg}</p>}
-            {successMsg && <p style={{ color: "#27ae60", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>✅ {successMsg}</p>}
+            <label className="field">
+              <span>รหัสผ่าน (Password)</span>
+              <div className="password-wrap">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  placeholder="อย่างน้อย 4 ตัวอักษร"
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? "ซ่อน" : "แสดง"}
+                </button>
+              </div>
+            </label>
 
-            <button type="submit" className="login-button" disabled={loading}>
-              {loading ? "กำลังสมัคร..." : "สมัครสมาชิก (ได้รับยศ Member)"}
-              {!loading && <span>{icons.chevron}</span>}
+            <label className="field">
+              <span>ยืนยันรหัสผ่าน</span>
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={regConfirm}
+                onChange={(e) => setRegConfirm(e.target.value)}
+                placeholder="กรอกรหัสผ่านอีกครั้ง"
+              />
+            </label>
+
+            {errorMsg && (
+              <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>
+                ⚠️ {errorMsg}
+              </p>
+            )}
+            {successMsg && (
+              <p style={{ color: "#27ae60", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>
+                ✅ {successMsg}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={loading}
+              style={{ width: "100%", height: "42px", fontSize: "14px", marginTop: "8px" }}
+            >
+              {loading ? "กำลังสมัคร..." : "สร้างบัญชี Admin"}
             </button>
-            <p className="demo-note">📋 Admin จะอัปเกรด Role ให้ทาง Firestore Console</p>
           </form>
         )}
-      </section>
-      <p className="login-footer">47RAVENGE © 2026 · ระบบจัดการค่าตอบแทนสมาชิก</p>
-    </main>
+
+        <div style={{ marginTop: "16px", textAlign: "center" }}>
+          <button
+            type="button"
+            className="outline-button"
+            style={{ width: "100%", fontSize: "12px" }}
+            onClick={onClose}
+          >
+            ยกเลิก / เข้าใช้งานในฐานะสมาชิกผู้เยี่ยมชม
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -600,11 +687,11 @@ function PlayerDetailModal({
           </div>
           <div style={{ background: "#fdf3e7", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
             <small style={{ color: "#888", fontSize: "11px" }}>ค่าคอม {commissionRate}%</small>
-            <strong style={{ display: "block", fontSize: "16px", color: "#e67e22" }}>฿{Math.round(totalCom).toLocaleString()}</strong>
+            <strong style={{ display: "block", fontSize: "16px", color: "#e67e22" }}>฿{formatMoney(totalCom)}</strong>
           </div>
           <div style={{ background: "#edfdf5", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
             <small style={{ color: "#888", fontSize: "11px" }}>กองกลางค่าแรง</small>
-            <strong style={{ display: "block", fontSize: "16px", color: "#27ae60" }}>฿{Math.round(totalWagePool).toLocaleString()}</strong>
+            <strong style={{ display: "block", fontSize: "16px", color: "#27ae60" }}>฿{formatMoney(totalWagePool)}</strong>
           </div>
         </div>
 
@@ -616,7 +703,7 @@ function PlayerDetailModal({
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
               {comPlayer && <PlayerAvatar player={comPlayer} small />}
               <strong style={{ fontSize: "13px" }}>{row.commissionTo}</strong>
-              <span style={{ color: "#e67e22", fontWeight: 700, fontSize: "13px" }}>฿{Math.round(totalCom).toLocaleString()}</span>
+              <span style={{ color: "#e67e22", fontWeight: 700, fontSize: "13px" }}>฿{formatMoney(totalCom)}</span>
             </div>
           </div>
         </div>
@@ -636,10 +723,10 @@ function PlayerDetailModal({
                   <div key={idx} style={{ background: "#fff", border: "1px solid #e1eaf3", borderRadius: "6px", padding: "8px 12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong style={{ fontSize: "13px", color: "#2c3e50" }}>
-                        ชั้น {seg.tierLabel} (ฐาน ฿{seg.price.toLocaleString()}{scale !== 1 ? ` → ยอดคิดจริง ฿${Math.round(effectivePrice).toLocaleString()}` : ""})
+                        ชั้น {seg.tierLabel} (ฐาน ฿{seg.price.toLocaleString()}{scale !== 1 ? ` → ยอดคิดจริง ฿${formatMoney(effectivePrice)}` : ""})
                       </strong>
                       <span style={{ fontSize: "12px", color: "#27ae60", fontWeight: 700 }}>
-                        แบ่งคนละ ฿{Math.round(segPerPerson).toLocaleString()}
+                        แบ่งคนละ ฿{formatMoney(segPerPerson)}
                       </span>
                     </div>
                     <div style={{ fontSize: "11px", color: "#666", marginTop: "3px" }}>
@@ -683,7 +770,7 @@ function PlayerDetailModal({
                   </small>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <strong style={{ fontSize: "15px", color: "#27ae60" }}>฿{Math.round(playerWage).toLocaleString()}</strong>
+                  <strong style={{ fontSize: "15px", color: "#27ae60" }}>฿{formatMoney(playerWage)}</strong>
                   <small style={{ display: "block", color: "#aaa", fontSize: "10px" }}>สุทธิหลังหักคอม</small>
                 </div>
               </div>
@@ -718,7 +805,17 @@ function PlayerDetailModal({
 }
 
 // ======================== DASHBOARD COMPONENT ========================
-function Dashboard({ role, username, onLogout }: { role: Role; username: string; onLogout: () => void }) {
+function Dashboard({
+  role,
+  username,
+  onLogout,
+  onOpenAdminLogin,
+}: {
+  role: Role;
+  username: string;
+  onLogout: () => void;
+  onOpenAdminLogin: () => void;
+}) {
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [memberList, setMemberList] = useState<Player[]>(DEFAULT_PLAYERS);
   const [dungeonTemplates, setDungeonTemplates] = useState<DungeonTemplate[]>(DEFAULT_DUNGEON_TEMPLATES);
@@ -751,6 +848,8 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
 
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [editPlayerNameVal, setEditPlayerNameVal] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [logFilter, setLogFilter] = useState("ทั้งหมด");
   const [toast, setToast] = useState("");
@@ -1377,6 +1476,54 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     }
   };
 
+  const handleSavePlayerEdit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingPlayer || !editPlayerNameVal.trim()) return;
+    const oldName = editingPlayer.name;
+    const newName = editPlayerNameVal.trim();
+    if (oldName === newName) {
+      setEditingPlayer(null);
+      return;
+    }
+
+    try {
+      if (editingPlayer.id && !editingPlayer.id.startsWith("p_") && !editingPlayer.id.startsWith("temp_")) {
+        try {
+          await updateDoc(doc(db, "players", editingPlayer.id), { name: newName });
+        } catch (_) {
+          const q = query(collection(db, "players"), where("name", "==", oldName));
+          const snap = await getDocs(q);
+          for (const d of snap.docs) {
+            await updateDoc(doc(db, "players", d.id), { name: newName });
+          }
+        }
+      } else {
+        const q = query(collection(db, "players"), where("name", "==", oldName));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          for (const d of snap.docs) {
+            await updateDoc(doc(db, "players", d.id), { name: newName });
+          }
+        } else {
+          await addDoc(collection(db, "players"), {
+            name: newName,
+            color: editingPlayer.color,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+
+      setMemberList((prev) =>
+        prev.map((p) => (p.id === editingPlayer.id || p.name === oldName ? { ...p, name: newName } : p))
+      );
+      await addLog("แก้ไขชื่อสมาชิก", `${oldName} → ${newName}`, "สมาชิก");
+      notify(`เปลี่ยนชื่อเป็น "${newName}" เรียบร้อยแล้ว`);
+      setEditingPlayer(null);
+    } catch (err: any) {
+      alert("แก้ไขชื่อไม่สำเร็จ: " + err.message);
+    }
+  };
+
   const handleDeleteUserAccount = async (u: { id: string; username: string; role: Role }) => {
     if (u.username === username) {
       alert("ไม่สามารถลบบัญชีของตัวเองที่กำลังล็อกอินอยู่ได้");
@@ -1543,13 +1690,13 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
         <td><strong>{row.ctm}</strong></td>
         <td>{row.detail}</td>
         <td className="money">฿{row.sale.toLocaleString()}</td>
-        <td className="commission">-฿{((row.sale * commissionRate) / 100).toLocaleString()} <small>({row.commissionTo})</small></td>
+        <td className="commission">-฿{formatMoney((row.sale * commissionRate) / 100)} <small>({row.commissionTo})</small></td>
         <td className="players-cell">
           <button className="player-names" onClick={() => setSelectedRow(row)}>
             {row.players.map((id) => memberList.find((p) => p.id === id)?.name || id).join(", ") || "-"}
           </button>
         </td>
-        <td className="payout">฿{Math.round(perPlayer).toLocaleString()}</td>
+        <td className="payout">฿{formatMoney(perPlayer)}</td>
         <td>
           {row.slip ? (
             <button type="button" onClick={() => setViewSlipUrl(row.slip!)} style={{ color: "#176bca", fontWeight: 700, fontSize: "12px", textDecoration: "underline" }}>
@@ -1620,18 +1767,36 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
         )}
 
         <div className="profile">
-          <div className="profile-avatar">{username.slice(0, 2).toUpperCase()}</div>
+          <div className="profile-avatar">{role === "admin" ? "🛡️" : "👤"}</div>
           {sidebarOpen && (
             <div className="profile-info">
-              <strong>{username}</strong>
-              <small style={{ color: role === "admin" ? "#176bca" : "#666" }}>
-                {role === "admin" ? "🛡️ ผู้ดูแลระบบ" : "👀 สมาชิก"}
+              <strong>{role === "admin" ? username : "ผู้เยี่ยมชม"}</strong>
+              <small style={{ color: role === "admin" ? "#176bca" : "#64748b" }}>
+                {role === "admin" ? "🛡️ ผู้ดูแลระบบ" : "👤 สมาชิก (ดูอย่างเดียว)"}
               </small>
             </div>
           )}
-          <button className="profile-logout-btn" onClick={onLogout} title="ออกจากระบบ">
-            {icons.logout}
-          </button>
+          {role === "admin" ? (
+            <button className="profile-logout-btn" onClick={onLogout} title="ออกจากระบบ Admin (กลับสู่โหมดผู้เยี่ยมชม)">
+              {icons.logout}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={onOpenAdminLogin}
+              style={{
+                height: "28px",
+                fontSize: "11px",
+                padding: sidebarOpen ? "0 8px" : "0 4px",
+                whiteSpace: "nowrap",
+                marginLeft: "auto"
+              }}
+              title="เข้าสู่ระบบ Admin"
+            >
+              {sidebarOpen ? "🔐 ล็อกอิน Admin" : "🔐"}
+            </button>
+          )}
         </div>
       </aside>
 
@@ -1644,6 +1809,27 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
             <small className="page-subtitle">{pageTitles[page][1]}</small>
           </div>
           <div className="header-actions">
+            {role === "member" && (
+              <button
+                type="button"
+                className="outline-button"
+                onClick={onOpenAdminLogin}
+                style={{
+                  height: "36px",
+                  fontSize: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderColor: "#176bca",
+                  color: "#176bca",
+                  background: "#edf5fd",
+                  fontWeight: 600,
+                  cursor: "pointer"
+                }}
+              >
+                🔐 เข้าสู่ระบบ Admin
+              </button>
+            )}
             {(page === "overview" || page === "payments") && role === "admin" && (
               <button className="primary-button" onClick={openAdd}>
                 {icons.plus} เพิ่มรอบดันเจี้ยน
@@ -1782,18 +1968,18 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                             </div>
                           </td>
                           <td>{p.rounds} รอบ</td>
-                          <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{Math.round(p.wage).toLocaleString()}</td>
-                          <td style={{ color: "#176bca", fontWeight: 700 }}>฿{Math.round(p.com).toLocaleString()}</td>
-                          <td className="money" style={{ fontSize: "14px" }}>฿{Math.round(p.grand).toLocaleString()}</td>
+                          <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{formatMoney(p.wage)}</td>
+                          <td style={{ color: "#176bca", fontWeight: 700 }}>฿{formatMoney(p.com)}</td>
+                          <td className="money" style={{ fontSize: "14px" }}>฿{formatMoney(p.grand)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr>
                         <td colSpan={3} style={{ fontWeight: 700, fontSize: "13px", color: "#172033" }}>รวมทั้งหมด</td>
-                        <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{Math.round(weeklySummary.reduce((s, p) => s + p.wage, 0)).toLocaleString()}</td>
-                        <td style={{ color: "#176bca", fontWeight: 700 }}>฿{Math.round(weeklySummary.reduce((s, p) => s + p.com, 0)).toLocaleString()}</td>
-                        <td className="money" style={{ fontSize: "14px" }}>฿{Math.round(weeklySummary.reduce((s, p) => s + p.grand, 0)).toLocaleString()}</td>
+                        <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{formatMoney(weeklySummary.reduce((s, p) => s + p.wage, 0))}</td>
+                        <td style={{ color: "#176bca", fontWeight: 700 }}>฿{formatMoney(weeklySummary.reduce((s, p) => s + p.com, 0))}</td>
+                        <td className="money" style={{ fontSize: "14px" }}>฿{formatMoney(weeklySummary.reduce((s, p) => s + p.grand, 0))}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1910,13 +2096,10 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
               {memberList
                 .filter((p) => p.name.toLowerCase().includes(memberSearch.toLowerCase()))
                 .map((player) => {
-                  const playerRuns = rows.filter((r) => r.players.includes(player.id));
-                  const income = playerRuns.reduce((sum, r) => {
-                    return sum + getPlayerWageForRun(r, player.id, commissionRate, defaultCarryCount);
-                  }, 0);
-                  const comIncome = rows
-                    .filter((r) => r.commissionTo === player.name)
-                    .reduce((sum, r) => sum + (r.sale * commissionRate) / 100, 0);
+                  const stats = weeklySummary.find((s) => s.id === player.id || isPlayerMatch(player, s.name));
+                  const playerRunsCount = stats?.rounds || 0;
+                  const income = stats?.wage || 0;
+                  const comIncome = stats?.com || 0;
 
                   return (
                     <article className="member-card" key={player.id}>
@@ -1924,29 +2107,54 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                         <span className="member-avatar" style={{ background: player.color }}>
                           {player.name.replace("K.", "").trim().slice(0, 1)}
                         </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "auto" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
                           <span className="status-dot">พร้อมแบก</span>
                           {role === "admin" && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteMember(player)}
-                              style={{
-                                border: 0,
-                                background: "#fee2e2",
-                                color: "#dc2626",
-                                borderRadius: "6px",
-                                width: "28px",
-                                height: "28px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                transition: "all 0.15s"
-                              }}
-                              title={`ลบสมาชิก ${player.name}`}
-                            >
-                              {icons.trash}
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPlayer(player);
+                                  setEditPlayerNameVal(player.name);
+                                }}
+                                style={{
+                                  border: 0,
+                                  background: "#dbeafe",
+                                  color: "#1d4ed8",
+                                  borderRadius: "6px",
+                                  width: "28px",
+                                  height: "28px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  fontSize: "13px"
+                                }}
+                                title={`แก้ไขชื่อ ${player.name}`}
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMember(player)}
+                                style={{
+                                  border: 0,
+                                  background: "#fee2e2",
+                                  color: "#dc2626",
+                                  borderRadius: "6px",
+                                  width: "28px",
+                                  height: "28px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  transition: "all 0.15s"
+                                }}
+                                title={`ลบสมาชิก ${player.name}`}
+                              >
+                                {icons.trash}
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1955,19 +2163,19 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                       <div className="member-metrics">
                         <div>
                           <span>รอบที่เล่น</span>
-                          <strong>{playerRuns.length} รอบ</strong>
+                          <strong>{playerRunsCount} รอบ</strong>
                         </div>
                         <div>
                           <span>ค่าแรง</span>
-                          <strong style={{ color: "#27ae60" }}>฿{Math.round(income).toLocaleString()}</strong>
+                          <strong style={{ color: "#27ae60" }}>฿{formatMoney(income)}</strong>
                         </div>
                         <div>
                           <span>ค่าคอม</span>
-                          <strong style={{ color: "#176bca" }}>฿{Math.round(comIncome).toLocaleString()}</strong>
+                          <strong style={{ color: "#176bca" }}>฿{formatMoney(comIncome)}</strong>
                         </div>
                         <div>
                           <span>รวมทั้งสิ้น</span>
-                          <strong className="money">฿{Math.round(income + comIncome).toLocaleString()}</strong>
+                          <strong className="money">฿{formatMoney(income + comIncome)}</strong>
                         </div>
                       </div>
                       <button
@@ -2083,29 +2291,21 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     </tr>
                   </thead>
                   <tbody>
-                    {memberList
-                      .map((p) => {
-                        const pRuns = rows.filter((r) => r.players.includes(p.id));
-                        const wage = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount), 0);
-                        const com = rows.filter((r) => r.commissionTo === p.name).reduce((sum, r) => sum + (r.sale * commissionRate) / 100, 0);
-                        return { ...p, rounds: pRuns.length, wage, com, grand: wage + com };
-                      })
-                      .sort((a, b) => b.grand - a.grand)
-                      .map((p, idx) => (
-                        <tr key={p.id}>
-                          <td><strong>{idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}</strong></td>
-                          <td>
-                            <div className="name-cell">
-                              <PlayerAvatar player={p} small />
-                              <strong>{p.name}</strong>
-                            </div>
-                          </td>
-                          <td>{p.rounds} รอบ</td>
-                          <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{Math.round(p.wage).toLocaleString()}</td>
-                          <td style={{ color: "#176bca", fontWeight: 700 }}>฿{Math.round(p.com).toLocaleString()}</td>
-                          <td className="money" style={{ fontSize: "14px" }}>฿{Math.round(p.grand).toLocaleString()}</td>
-                        </tr>
-                      ))}
+                    {weeklySummary.map((p, idx) => (
+                      <tr key={p.id}>
+                        <td><strong>{idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}</strong></td>
+                        <td>
+                          <div className="name-cell">
+                            <PlayerAvatar player={p} small />
+                            <strong>{p.name}</strong>
+                          </div>
+                        </td>
+                        <td>{p.rounds} รอบ</td>
+                        <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{formatMoney(p.wage)}</td>
+                        <td style={{ color: "#176bca", fontWeight: 700 }}>฿{formatMoney(p.com)}</td>
+                        <td className="money" style={{ fontSize: "14px" }}>฿{formatMoney(p.grand)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -2954,7 +3154,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                                 }}>
                                   {breakdownFloors.map((fl) => {
                                     const floorPrice = fl.price * scale;
-                                    const floorWagePerPerson = Math.round((floorPrice * comMult) / selectedPlayers.length);
+                                    const floorWagePerPerson = (floorPrice * comMult) / selectedPlayers.length;
                                     return (
                                       <div
                                         key={fl.label}
@@ -2972,12 +3172,12 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                                           ชั้น {fl.label.replace(/^ชั้น\s*/i, "")}
                                           {scale !== 1 && (
                                             <small style={{ color: "#6b7280", marginLeft: "3px" }}>
-                                              (฿{Math.round(floorPrice)})
+                                              (฿{formatMoney(floorPrice)})
                                             </small>
                                           )}
                                         </span>
                                         <b style={{ color: "#15803d", marginLeft: "4px" }}>
-                                          ฿{floorWagePerPerson.toLocaleString()}
+                                          ฿{formatMoney(floorWagePerPerson)}
                                         </b>
                                       </div>
                                     );
@@ -2995,7 +3195,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                                 }}>
                                   <span>รวมทุกชั้นได้คนละ:</span>
                                   <span style={{ color: "#15803d" }}>
-                                    ฿{Math.round(totalPerPerson).toLocaleString()} / คน
+                                    ฿{formatMoney(totalPerPerson)} / คน
                                   </span>
                                 </div>
                               </div>
@@ -3007,7 +3207,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                                 return (
                                   <div key={pid} className="live-wage-item">
                                     <span>{p?.name || pid}</span>
-                                    <b>฿{Math.round(totalPerPerson).toLocaleString()}</b>
+                                    <b>฿{formatMoney(totalPerPerson)}</b>
                                   </div>
                                 );
                               })}
@@ -3028,13 +3228,13 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                           const assigned = tierPlayerMap[tier.label] || [];
                           const tierPriceScaled = tier.price * scale;
                           const tierWage = assigned.length > 0
-                            ? Math.round((tierPriceScaled * (1 - commissionRate / 100)) / assigned.length)
+                            ? (tierPriceScaled * (1 - commissionRate / 100)) / assigned.length
                             : null;
                           return (
                             <div key={tier.label} className="tier-assign-card">
                               <div className="tier-assign-head">
                                 <strong>
-                                  ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · ฿{Math.round(tierPriceScaled).toLocaleString()}/คน
+                                  ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · ฿{formatMoney(tierPriceScaled)}/คน
                                   {scale !== 1 && (
                                     <small style={{ color: "#64748b", fontWeight: 400, marginLeft: "4px" }}>
                                       (ฐาน ฿{tier.price})
@@ -3043,7 +3243,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                                 </strong>
                                 <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
                                   {assigned.length > 0
-                                    ? `${assigned.length} คน → คนละ ฿${tierWage?.toLocaleString()}`
+                                    ? `${assigned.length} คน → คนละ ฿${formatMoney(tierWage)}`
                                     : "⚠️ ยังไม่เลือกคน"}
                                 </small>
                               </div>
@@ -3155,6 +3355,39 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
         </div>
       )}
 
+      {/* ======================== MODAL: EDIT MEMBER ======================== */}
+      {editingPlayer && role === "admin" && (
+        <div className="modal-backdrop" onMouseDown={() => setEditingPlayer(null)}>
+          <form
+            className="modal"
+            onSubmit={handleSavePlayerEdit}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ width: "420px" }}
+          >
+            <button type="button" className="modal-close" onClick={() => setEditingPlayer(null)}>×</button>
+            <span className="eyebrow">แก้ไขสมาชิก</span>
+            <h2>แก้ไขชื่อสมาชิก</h2>
+            <p>เปลี่ยนชื่อของ <strong>{editingPlayer.name}</strong></p>
+
+            <label className="field" style={{ marginTop: "16px" }}>
+              <span>ชื่อสมาชิกใหม่ / Player Name</span>
+              <input
+                required
+                autoFocus
+                value={editPlayerNameVal}
+                onChange={(e) => setEditPlayerNameVal(e.target.value)}
+                placeholder="เช่น K.Baki"
+              />
+            </label>
+
+            <div className="modal-actions" style={{ marginTop: "20px" }}>
+              <button type="button" onClick={() => setEditingPlayer(null)}>ยกเลิก</button>
+              <button type="submit" className="primary-button">บันทึกชื่อใหม่</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* ======================== MODAL: VIEW FULL SLIP ======================== */}
       {viewSlipUrl && (
         <div className="modal-backdrop" onMouseDown={() => setViewSlipUrl(null)}>
@@ -3193,30 +3426,45 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
 
 // ======================== ROOT APP COMPONENT ========================
 export default function App() {
-  const [session, setSession] = useState<{ role: Role; username: string } | null>(() => {
+  const [session, setSession] = useState<{ role: Role; username: string }>(() => {
     const savedRole = localStorage.getItem("47manage_role") as Role | null;
     const savedUser = localStorage.getItem("47manage_username") || "";
-    if (savedRole && (savedRole === "admin" || savedRole === "member")) {
-      return { role: savedRole, username: savedUser || (savedRole === "admin" ? "Admin" : "Member") };
+    if (savedRole === "admin" && savedUser) {
+      return { role: "admin", username: savedUser };
     }
-    return null;
+    // Default to visitor / member view mode directly without prompting
+    return { role: "member", username: "ผู้เยี่ยมชม" };
   });
 
-  const handleLogin = (role: Role, username: string) => {
-    localStorage.setItem("47manage_role", role);
+  const [showAdminAuth, setShowAdminAuth] = useState(false);
+
+  const handleAdminLogin = (username: string) => {
+    localStorage.setItem("47manage_role", "admin");
     localStorage.setItem("47manage_username", username);
-    setSession({ role, username });
+    setSession({ role: "admin", username });
+    setShowAdminAuth(false);
   };
 
   const handleLogout = () => {
     localStorage.removeItem("47manage_role");
     localStorage.removeItem("47manage_username");
-    setSession(null);
+    setSession({ role: "member", username: "ผู้เยี่ยมชม" });
   };
 
-  return session ? (
-    <Dashboard role={session.role} username={session.username} onLogout={handleLogout} />
-  ) : (
-    <Login onLogin={handleLogin} />
+  return (
+    <>
+      <Dashboard
+        role={session.role}
+        username={session.username}
+        onLogout={handleLogout}
+        onOpenAdminLogin={() => setShowAdminAuth(true)}
+      />
+      {showAdminAuth && (
+        <AdminAuthModal
+          onLogin={handleAdminLogin}
+          onClose={() => setShowAdminAuth(false)}
+        />
+      )}
+    </>
   );
 }
