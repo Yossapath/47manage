@@ -2248,7 +2248,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                       className={`carry-mode-tab${!isSplitCarry ? " active" : ""}`}
                       onClick={() => { setIsSplitCarry(false); setTierPlayerMap({}); }}
                     >
-                      🤝 แบกพร้อมกัน (ทุกชั้น)
+                      🤝 แบกพร้อมกัน
                     </button>
                     <button
                       type="button"
@@ -2257,6 +2257,18 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     >
                       🔀 แบ่งทีมแต่ละชั้น
                     </button>
+                  </div>
+
+                  {/* Banner showing current mode */}
+                  <div style={{
+                    fontSize: "11px", fontWeight: 700, padding: "5px 10px", borderRadius: "5px", marginBottom: "10px",
+                    background: isSplitCarry ? "#fef9c3" : "#f0fdf4",
+                    color: isSplitCarry ? "#854d0e" : "#166534",
+                    border: isSplitCarry ? "1px solid #fde68a" : "1px solid #bbf7d0"
+                  }}>
+                    {isSplitCarry
+                      ? `🔀 โหมดแบ่งทีม — เลือกคนแบกแต่ละชั้นด้านล่าง (${selectedTiers.length} ชั้น)`
+                      : `🤝 โหมดแบกรวม — เลือกทีมแบกทุกชั้นพร้อมกัน`}
                   </div>
 
                   {!isSplitCarry ? (
@@ -2319,14 +2331,17 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     <div>
                       {selectedTiers.map((tier) => {
                         const assigned = tierPlayerMap[tier.label] || [];
+                        const tierWage = assigned.length > 0
+                          ? Math.round(tier.price * (1 - commissionRate / 100) / assigned.length)
+                          : null;
                         return (
                           <div key={tier.label} className="tier-assign-card">
                             <div className="tier-assign-head">
-                              <strong>ชั้น {tier.label} (฿{tier.price.toLocaleString()})</strong>
-                              <small>
-                                {assigned.length} คน → คนละ ฿{assigned.length > 0
-                                  ? Math.round(tier.price * (1 - commissionRate / 100) / assigned.length).toLocaleString()
-                                  : "?"}
+                              <strong>ชั้น {tier.label} · ฿{tier.price.toLocaleString()}/คน (ฐาน)</strong>
+                              <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
+                                {assigned.length > 0
+                                  ? `${assigned.length} คน → คนละ ฿${tierWage?.toLocaleString()}`
+                                  : "⚠️ ยังไม่เลือกคน"}
                               </small>
                             </div>
                             <div className="tier-player-chips">
