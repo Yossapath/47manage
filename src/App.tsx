@@ -163,6 +163,33 @@ function isPlayerMatch(player: Player, identifier: string): boolean {
   return false;
 }
 
+// Auto-expand a tier whose label is a floor range (e.g. "1-5", "เหมา 1-5") into individual floor tiers.
+// Each floor gets price = floor(totalPrice / count); remainder added to last floor.
+function expandTiersForSplit(tiers: DungeonTier[]): DungeonTier[] {
+  const result: DungeonTier[] = [];
+  for (const tier of tiers) {
+    const match = tier.label.match(/(\d+)\s*-\s*(\d+)/);
+    if (match) {
+      const start = parseInt(match[1], 10);
+      const end = parseInt(match[2], 10);
+      if (end > start && end - start < 30) {
+        const count = end - start + 1;
+        const basePrice = Math.floor(tier.price / count);
+        const remainder = tier.price - basePrice * count;
+        for (let i = 0; i < count; i++) {
+          result.push({
+            label: String(start + i),
+            price: basePrice + (i === count - 1 ? remainder : 0),
+          });
+        }
+        continue;
+      }
+    }
+    result.push(tier);
+  }
+  return result;
+}
+
 // Calculate the precise wage for a specific player in a given run
 // Supports proportional discount scaling: if customer pays less than base tiers sum,
 // each tier is discounted by that exact percentage before calculating per-player wages!
@@ -1029,14 +1056,16 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     let segments: RunSegment[] = [];
 
     if (isSplitCarry) {
-      for (const t of selectedTiers) {
+      // Expand range tiers (e.g. "เหมา 1-5") into individual floor tiers for per-floor assignment
+      const tiersForSplit = expandTiersForSplit(selectedTiers);
+      for (const t of tiersForSplit) {
         const assigned = tierPlayerMap[t.label] || [];
         if (assigned.length === 0) {
           notify(`กรุณาเลือกคนแบกสำหรับชั้น ${t.label}`);
           return;
         }
       }
-      segments = selectedTiers.map((t) => ({
+      segments = tiersForSplit.map((t) => ({
         tierLabel: t.label,
         price: t.price,
         players: tierPlayerMap[t.label] || [],
@@ -2158,8 +2187,10 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     <strong style={{ fontSize: "13px" }}>เลือกชั้นที่ลง</strong>
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button type="button" className="tier-quick-btn" onClick={() => {
-                        setSelectedTiers([...selectedDiff.tiers]);
-                        setFormSaleOverride(selectedDiff.tiers.reduce((s, t) => s + t.price, 0));
+                        // Select all tiers, replacing any partial selection
+                        const all = [...selectedDiff.tiers];
+                        setSelectedTiers(all);
+                        setFormSaleOverride(all.reduce((s, t) => s + t.price, 0));
                         setTierPlayerMap({});
                       }}>เหมาทุกชั้น</button>
                       <button type="button" className="tier-quick-btn" onClick={() => {
@@ -2171,6 +2202,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   </div>
                   <div className="tier-chips-grid">
                     {selectedDiff.tiers.map((tier) => {
+                      const isRange = /\d+\s*-\s*\d+/.test(tier.label);
                       const isSelected = selectedTiers.some((t) => t.label === tier.label);
                       return (
                         <button
@@ -2178,18 +2210,27 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                           type="button"
                           className={`tier-chip-btn${isSelected ? " selected" : ""}`}
                           onClick={() => {
-                            const next = isSelected
-                              ? selectedTiers.filter((t) => t.label !== tier.label)
-                              : [...selectedTiers, tier].sort((a, b) => selectedDiff.tiers.findIndex((x) => x.label === a.label) - selectedDiff.tiers.findIndex((x) => x.label === b.label));
+                            let next: DungeonTier[];
+                            if (isSelected) {
+                              // Deselect this tier
+                              next = selectedTiers.filter((t) => t.label !== tier.label);
+                            } else if (isRange) {
+                              // Range tier selected → clear all others (mutually exclusive)
+                              next = [tier];
+                            } else {
+                              // Individual tier selected → remove any range tiers, add this one
+                              const noRanges = selectedTiers.filter((t) => !/\d+\s*-\s*\d+/.test(t.label));
+                              next = [...noRanges, tier].sort(
+                                (a, b) => selectedDiff.tiers.findIndex((x) => x.label === a.label)
+                                        - selectedDiff.tiers.findIndex((x) => x.label === b.label)
+                              );
+                            }
                             setSelectedTiers(next);
                             setFormSaleOverride(next.reduce((s, t) => s + t.price, 0));
-                            if (!isSelected) {
-                              /* keep existing tierPlayerMap entry */
-                            } else {
-                              const newMap = { ...tierPlayerMap };
-                              delete newMap[tier.label];
-                              setTierPlayerMap(newMap);
-                            }
+                            // Clean up tierPlayerMap for removed tiers
+                            const newMap = { ...tierPlayerMap };
+                            if (isSelected) delete newMap[tier.label];
+                            setTierPlayerMap(newMap);
                           }}
                         >
                           <span className="tier-chip-label">ชั้น {tier.label}</span>
@@ -2260,16 +2301,21 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   </div>
 
                   {/* Banner showing current mode */}
-                  <div style={{
-                    fontSize: "11px", fontWeight: 700, padding: "5px 10px", borderRadius: "5px", marginBottom: "10px",
-                    background: isSplitCarry ? "#fef9c3" : "#f0fdf4",
-                    color: isSplitCarry ? "#854d0e" : "#166534",
-                    border: isSplitCarry ? "1px solid #fde68a" : "1px solid #bbf7d0"
-                  }}>
-                    {isSplitCarry
-                      ? `🔀 โหมดแบ่งทีม — เลือกคนแบกแต่ละชั้นด้านล่าง (${selectedTiers.length} ชั้น)`
-                      : `🤝 โหมดแบกรวม — เลือกทีมแบกทุกชั้นพร้อมกัน`}
-                  </div>
+                  {(() => {
+                    const expandedCount = expandTiersForSplit(selectedTiers).length;
+                    return (
+                      <div style={{
+                        fontSize: "11px", fontWeight: 700, padding: "5px 10px", borderRadius: "5px", marginBottom: "10px",
+                        background: isSplitCarry ? "#fef9c3" : "#f0fdf4",
+                        color: isSplitCarry ? "#854d0e" : "#166534",
+                        border: isSplitCarry ? "1px solid #fde68a" : "1px solid #bbf7d0"
+                      }}>
+                        {isSplitCarry
+                          ? `🔀 โหมดแบ่งทีม — เลือกคนแบกแต่ละชั้นด้านล่าง (${expandedCount} ชั้น)`
+                          : `🤝 โหมดแบกรวม — เลือกทีมแบกทุกชั้นพร้อมกัน`}
+                      </div>
+                    );
+                  })()}
 
                   {!isSplitCarry ? (
                     <div>
@@ -2329,42 +2375,45 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     </div>
                   ) : (
                     <div>
-                      {selectedTiers.map((tier) => {
-                        const assigned = tierPlayerMap[tier.label] || [];
-                        const tierWage = assigned.length > 0
-                          ? Math.round(tier.price * (1 - commissionRate / 100) / assigned.length)
-                          : null;
-                        return (
-                          <div key={tier.label} className="tier-assign-card">
-                            <div className="tier-assign-head">
-                              <strong>ชั้น {tier.label} · ฿{tier.price.toLocaleString()}/คน (ฐาน)</strong>
-                              <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
-                                {assigned.length > 0
-                                  ? `${assigned.length} คน → คนละ ฿${tierWage?.toLocaleString()}`
-                                  : "⚠️ ยังไม่เลือกคน"}
-                              </small>
+                      {(() => {
+                        const expandedTiers = expandTiersForSplit(selectedTiers);
+                        return expandedTiers.map((tier) => {
+                          const assigned = tierPlayerMap[tier.label] || [];
+                          const tierWage = assigned.length > 0
+                            ? Math.round(tier.price * (1 - commissionRate / 100) / assigned.length)
+                            : null;
+                          return (
+                            <div key={tier.label} className="tier-assign-card">
+                              <div className="tier-assign-head">
+                                <strong>ชั้น {tier.label} · ฿{tier.price.toLocaleString()}/คน (ฐาน)</strong>
+                                <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
+                                  {assigned.length > 0
+                                    ? `${assigned.length} คน → คนละ ฿${tierWage?.toLocaleString()}`
+                                    : "⚠️ ยังไม่เลือกคน"}
+                                </small>
+                              </div>
+                              <div className="tier-player-chips">
+                                {memberList.map((p) => {
+                                  const isOn = assigned.includes(p.id);
+                                  return (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      className={`tier-pchip${isOn ? " active" : ""}`}
+                                      onClick={() => {
+                                        const next = isOn ? assigned.filter((x) => x !== p.id) : [...assigned, p.id];
+                                        setTierPlayerMap({ ...tierPlayerMap, [tier.label]: next });
+                                      }}
+                                    >
+                                      {p.name}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
-                            <div className="tier-player-chips">
-                              {memberList.map((p) => {
-                                const isOn = assigned.includes(p.id);
-                                return (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    className={`tier-pchip${isOn ? " active" : ""}`}
-                                    onClick={() => {
-                                      const next = isOn ? assigned.filter((x) => x !== p.id) : [...assigned, p.id];
-                                      setTierPlayerMap({ ...tierPlayerMap, [tier.label]: next });
-                                    }}
-                                  >
-                                    {p.name}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                 </>
