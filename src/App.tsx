@@ -95,11 +95,22 @@ const DEFAULT_DUNGEON_TEMPLATES: DungeonTemplate[] = [
       {
         name: "Nightmare",
         tiers: [
-          { label: "1", price: 200 },
-          { label: "2", price: 200 },
-          { label: "3", price: 200 },
-          { label: "4", price: 200 },
-          { label: "5", price: 300 },
+          { label: "1", price: 150 },
+          { label: "2", price: 150 },
+          { label: "3", price: 150 },
+          { label: "4", price: 150 },
+          { label: "5", price: 200 },
+          { label: "เหมา 1-5", price: 600 },
+        ],
+      },
+      {
+        name: "Hard",
+        tiers: [
+          { label: "1", price: 30 },
+          { label: "2", price: 30 },
+          { label: "3", price: 30 },
+          { label: "4", price: 30 },
+          { label: "5", price: 30 },
         ],
       },
       {
@@ -109,17 +120,8 @@ const DEFAULT_DUNGEON_TEMPLATES: DungeonTemplate[] = [
           { label: "2", price: 400 },
           { label: "3", price: 400 },
           { label: "4", price: 400 },
-          { label: "5", price: 600 },
-        ],
-      },
-      {
-        name: "Infinite",
-        tiers: [
-          { label: "1", price: 800 },
-          { label: "2", price: 800 },
-          { label: "3", price: 800 },
-          { label: "4", price: 800 },
-          { label: "5", price: 1200 },
+          { label: "5", price: 500 },
+          { label: "เหมา 1-5", price: 1800 },
         ],
       },
     ],
@@ -899,10 +901,58 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     return null;
   };
 
+  // Helper: check if a row matches the selected dungeon/difficulty filter
+  const matchesDungeonFilter = (row: PaymentRow, filterKey: string): boolean => {
+    if (!filterKey || filterKey === "ทั้งหมด" || filterKey === "all") return true;
+
+    const rowDungeon = (row.dungeon || "").trim().toLowerCase();
+    const rowDiff = (row.difficulty || "").trim().toLowerCase();
+    const rowTier = (row.tier || "").trim().toLowerCase();
+    const combined = `${rowDungeon} ${rowDiff} ${rowTier}`;
+
+    // Filter by specific difficulty e.g. "diff:Apo:Nightmare"
+    if (filterKey.startsWith("diff:")) {
+      const parts = filterKey.split(":");
+      const fDungeon = (parts[1] || "").toLowerCase();
+      const fDiff = (parts[2] || "").toLowerCase();
+
+      // Direct match
+      const dMatch = rowDungeon === fDungeon || rowDungeon.includes(fDungeon) || fDungeon.includes(rowDungeon);
+      const diffMatch = rowDiff === fDiff || rowDiff.includes(fDiff) || fDiff.includes(rowDiff);
+      if (dMatch && diffMatch) return true;
+
+      // Smart match for Apo difficulties across legacy rows (e.g. "Apo NM 1-5", "Apo 4-5", etc.)
+      if (fDungeon.includes("apo") || rowDungeon.includes("apo")) {
+        if (fDiff.includes("nightmare") || fDiff === "nm") {
+          return combined.includes("nightmare") || combined.includes("nm") || rowDiff === "nightmare";
+        }
+        if (fDiff.includes("hell")) {
+          return combined.includes("hell") || rowDiff === "hell";
+        }
+        if (fDiff.includes("hard")) {
+          return combined.includes("hard") || rowDiff === "hard";
+        }
+      }
+
+      return false;
+    }
+
+    // Filter by entire dungeon e.g. "dungeon:Apo" or "dungeon:Maya95"
+    if (filterKey.startsWith("dungeon:")) {
+      const fDungeon = filterKey.replace("dungeon:", "").trim().toLowerCase();
+      if (fDungeon.startsWith("maya") && rowDungeon.startsWith("maya")) return true;
+      if (fDungeon.startsWith("apo") && rowDungeon.startsWith("apo")) return true;
+      return rowDungeon === fDungeon || rowDungeon.includes(fDungeon) || fDungeon.includes(rowDungeon);
+    }
+
+    // Direct fallback
+    return row.dungeon === filterKey || rowDungeon.includes(filterKey.toLowerCase());
+  };
+
   // Filtered rows
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
-      const matchDungeon = selectedDungeonFilter === "ทั้งหมด" || row.dungeon === selectedDungeonFilter;
+      const matchDungeon = matchesDungeonFilter(row, selectedDungeonFilter);
       const matchDate = !dateFilter || row.date.toLowerCase().includes(dateFilter.toLowerCase());
       // Date range filter
       let matchFrom = true;
@@ -928,7 +978,41 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   const payout = total - commission;
   const activePlayerIds = new Set(filteredRows.flatMap((row) => row.players));
 
-  // Derived flat list of dungeon names for filter dropdowns
+  // Derived filter options: separates dungeons and difficulties (e.g. Apo (ทั้งหมด), Apo Nightmare, Apo Hard, Apo Hell, Maya95)
+  const dungeonFilterOptions = useMemo(() => {
+    const list: { value: string; label: string }[] = [];
+    const seenDungNames = new Set<string>();
+
+    dungeonTemplates.forEach((tmpl) => {
+      seenDungNames.add(tmpl.name.toLowerCase());
+      if (tmpl.difficulties && tmpl.difficulties.length > 1) {
+        list.push({ value: `dungeon:${tmpl.name}`, label: `${tmpl.name} (ทั้งหมด)` });
+        tmpl.difficulties.forEach((diff) => {
+          list.push({ value: `diff:${tmpl.name}:${diff.name}`, label: `${tmpl.name} ${diff.name}` });
+        });
+      } else if (tmpl.difficulties && tmpl.difficulties.length === 1 && tmpl.difficulties[0].name && tmpl.difficulties[0].name !== "ระดับเดียว") {
+        list.push({ value: `dungeon:${tmpl.name}`, label: `${tmpl.name} (${tmpl.difficulties[0].name})` });
+      } else {
+        list.push({ value: `dungeon:${tmpl.name}`, label: tmpl.name });
+      }
+    });
+
+    // Check for any legacy row dungeons not covered by templates
+    rows.forEach((r) => {
+      if (!r.dungeon) return;
+      const dLower = r.dungeon.toLowerCase();
+      const covered = Array.from(seenDungNames).some((known) =>
+        dLower.includes(known) || known.includes(dLower) || (dLower.startsWith("maya") && known.startsWith("maya")) || (dLower.startsWith("apo") && known.startsWith("apo"))
+      );
+      if (!covered && !list.some((opt) => opt.value === r.dungeon)) {
+        list.push({ value: r.dungeon, label: r.dungeon });
+      }
+    });
+
+    return list;
+  }, [dungeonTemplates, rows]);
+
+  // Derived flat list of dungeon names for filter dropdowns (kept for backward compatibility)
   const allDungeonNames = useMemo(() =>
     Array.from(new Set(rows.map((r) => r.dungeon).filter(Boolean))),
     [rows]
@@ -1523,7 +1607,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     {icons.filter}
                     <select value={selectedDungeonFilter} onChange={(e) => setSelectedDungeonFilter(e.target.value)}>
                       <option value="ทั้งหมด">ทุกดันเจี้ยน</option>
-                      {allDungeonNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                      {dungeonFilterOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                   </label>
                   <input
@@ -1643,7 +1727,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   {icons.filter}
                   <select value={selectedDungeonFilter} onChange={(e) => setSelectedDungeonFilter(e.target.value)}>
                     <option value="ทั้งหมด">ทุกดันเจี้ยน</option>
-                    {allDungeonNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                    {dungeonFilterOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </label>
                 <input
@@ -2436,7 +2520,26 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   <input name="ctm" required placeholder="ชื่อลูกค้า" defaultValue={editRow?.ctm ?? ""} />
                 </label>
                 <label className="field">
-                  <span>ยอดขายจริง (บาท) — ฐาน ฿{selectedTiers.reduce((s, t) => s + t.price, 0).toLocaleString()}</span>
+                  <span>
+                    ยอดขายจริง (บาท)
+                    {(() => {
+                      const baseSum = selectedTiers.reduce((s, t) => s + t.price, 0);
+                      if (baseSum <= 0) return null;
+                      const discountPct = baseSum > 0 ? Math.round((1 - formSaleOverride / baseSum) * 100) : 0;
+                      return (
+                        <span style={{ marginLeft: "8px", fontSize: "11px", fontWeight: 600 }}>
+                          ฐาน <strong>฿{baseSum.toLocaleString()}</strong>
+                          {formSaleOverride > 0 && formSaleOverride !== baseSum && (
+                            discountPct > 0
+                              ? <span style={{ color: "#e53e3e", marginLeft: "6px" }}>▼ ส่วนลด {discountPct}%</span>
+                              : discountPct < 0
+                              ? <span style={{ color: "#22c55e", marginLeft: "6px" }}>▲ เกินฐาน {Math.abs(discountPct)}%</span>
+                              : null
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </span>
                   <input
                     key={`sale-${selectedTiers.map((t) => t.label).join("")}`}
                     name="sale"
@@ -2444,8 +2547,36 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     min="1"
                     type="number"
                     placeholder="400"
-                    defaultValue={editRow?.sale ?? selectedTiers.reduce((s, t) => s + t.price, 0)}
+                    value={formSaleOverride || ""}
+                    onChange={(e) => setFormSaleOverride(Number(e.target.value))}
                   />
+                  {(() => {
+                    const baseSum = selectedTiers.reduce((s, t) => s + t.price, 0);
+                    if (baseSum <= 0 || formSaleOverride <= 0 || formSaleOverride === baseSum) return null;
+                    const discountPct = Math.round((1 - formSaleOverride / baseSum) * 100);
+                    const diff = baseSum - formSaleOverride;
+                    return (
+                      <div style={{
+                        marginTop: "6px",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        background: discountPct > 0 ? "#fff5f5" : "#f0fdf4",
+                        border: `1px solid ${discountPct > 0 ? "#fed7d7" : "#bbf7d0"}`,
+                        fontSize: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}>
+                        {discountPct > 0 ? "🏷️" : "📈"}
+                        <span>
+                          {discountPct > 0
+                            ? <>ส่วนลด <strong style={{ color: "#e53e3e" }}>{discountPct}%</strong> (ลด ฿{Math.abs(diff).toLocaleString()} จากฐาน ฿{baseSum.toLocaleString()})</>
+                            : <>เกินฐาน <strong style={{ color: "#16a34a" }}>{Math.abs(discountPct)}%</strong> (เพิ่ม ฿{Math.abs(diff).toLocaleString()} จากฐาน ฿{baseSum.toLocaleString()})</>
+                          }
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </label>
               </div>
 
@@ -2541,12 +2672,30 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                         const breakdownFloors = expandTiersForSplit(selectedTiers, selectedDiff?.tiers);
                         const comMult = 1 - commissionRate / 100;
                         const baseSum = selectedTiers.reduce((s, t) => s + t.price, 0);
-                        const totalPerPerson = (baseSum * comMult) / selectedPlayers.length;
+                        const effectiveSale = formSaleOverride > 0 ? formSaleOverride : baseSum;
+                        const scale = baseSum > 0 ? effectiveSale / baseSum : 1;
+                        const discountPct = baseSum > 0 ? Math.round((1 - effectiveSale / baseSum) * 100) : 0;
+                        const totalPerPerson = (effectiveSale * comMult) / selectedPlayers.length;
 
                         return (
                           <div className="live-wage-preview">
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
-                              <strong style={{ margin: 0, fontSize: "13px" }}>💡 ประมาณการ (ราคาฐาน ก่อนใส่ยอดจริง)</strong>
+                              <strong style={{ margin: 0, fontSize: "13px" }}>
+                                💡 ประมาณการรายได้จริง
+                                {discountPct > 0 ? (
+                                  <span style={{ color: "#dc2626", marginLeft: "6px", fontSize: "11px", fontWeight: 700 }}>
+                                    (ลด {discountPct}% · ยอดจริง ฿{effectiveSale.toLocaleString()})
+                                  </span>
+                                ) : discountPct < 0 ? (
+                                  <span style={{ color: "#16a34a", marginLeft: "6px", fontSize: "11px", fontWeight: 700 }}>
+                                    (เกินฐาน {Math.abs(discountPct)}% · ยอดจริง ฿{effectiveSale.toLocaleString()})
+                                  </span>
+                                ) : (
+                                  <span style={{ color: "#6b7280", marginLeft: "6px", fontSize: "11px", fontWeight: 500 }}>
+                                    (ราคาฐาน ฿{baseSum.toLocaleString()})
+                                  </span>
+                                )}
+                              </strong>
                               <span style={{ fontSize: "11px", color: "#166534", fontWeight: 600 }}>
                                 หักคอม {commissionRate}% · หาร {selectedPlayers.length} คน
                               </span>
@@ -2570,7 +2719,8 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                                   gap: "6px"
                                 }}>
                                   {breakdownFloors.map((fl) => {
-                                    const floorWagePerPerson = Math.round((fl.price * comMult) / selectedPlayers.length);
+                                    const floorPrice = fl.price * scale;
+                                    const floorWagePerPerson = Math.round((floorPrice * comMult) / selectedPlayers.length);
                                     return (
                                       <div
                                         key={fl.label}
@@ -2585,7 +2735,12 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                                         }}
                                       >
                                         <span style={{ color: "#374151" }}>
-                                          ชั้น {fl.label} <small style={{ color: "#6b7280" }}>(฿{fl.price})</small>
+                                          ชั้น {fl.label.replace(/^ชั้น\s*/i, "")}
+                                          {scale !== 1 && (
+                                            <small style={{ color: "#6b7280", marginLeft: "3px" }}>
+                                              (฿{Math.round(floorPrice)})
+                                            </small>
+                                          )}
                                         </span>
                                         <b style={{ color: "#15803d", marginLeft: "4px" }}>
                                           ฿{floorWagePerPerson.toLocaleString()}
@@ -2631,15 +2786,27 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     <div>
                       {(() => {
                         const expandedTiers = expandTiersForSplit(selectedTiers, selectedDiff?.tiers);
+                        const baseSum = selectedTiers.reduce((s, t) => s + t.price, 0);
+                        const effectiveSale = formSaleOverride > 0 ? formSaleOverride : baseSum;
+                        const scale = baseSum > 0 ? effectiveSale / baseSum : 1;
+
                         return expandedTiers.map((tier) => {
                           const assigned = tierPlayerMap[tier.label] || [];
+                          const tierPriceScaled = tier.price * scale;
                           const tierWage = assigned.length > 0
-                            ? Math.round(tier.price * (1 - commissionRate / 100) / assigned.length)
+                            ? Math.round((tierPriceScaled * (1 - commissionRate / 100)) / assigned.length)
                             : null;
                           return (
                             <div key={tier.label} className="tier-assign-card">
                               <div className="tier-assign-head">
-                                <strong>ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · ฿{tier.price.toLocaleString()}/คน (ฐาน)</strong>
+                                <strong>
+                                  ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · ฿{Math.round(tierPriceScaled).toLocaleString()}/คน
+                                  {scale !== 1 && (
+                                    <small style={{ color: "#64748b", fontWeight: 400, marginLeft: "4px" }}>
+                                      (ฐาน ฿{tier.price})
+                                    </small>
+                                  )}
+                                </strong>
                                 <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
                                   {assigned.length > 0
                                     ? `${assigned.length} คน → คนละ ฿${tierWage?.toLocaleString()}`
