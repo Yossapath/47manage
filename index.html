@@ -260,20 +260,20 @@
     <!-- Tab: Login -->
     <div id="authTabLogin" class="p-4 space-y-3 text-xs">
       <div class="flex bg-slate-100 p-0.5 rounded-lg">
-        <button onclick="showAuthTab('login')" id="tabBtnLogin" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition bg-white text-sky-700 shadow-sm">เข้าสู่ระบบ</button>
+        <button onclick="showAuthTab('login')" id="tabBtnLogin" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition bg-white text-sky-700 shadow-sm">เข้าสู่ระบบผู้ดูแล</button>
         <button onclick="showAuthTab('register')" id="tabBtnRegister" class="flex-1 py-1.5 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-700">สมัครผู้ดูแลใหม่</button>
       </div>
       <form onsubmit="handleLogin(event)" class="space-y-2.5">
         <div>
-          <label class="block font-medium text-slate-700 mb-0.5">อีเมล</label>
-          <input type="email" id="loginEmail" required placeholder="admin@example.com" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
+          <label class="block font-medium text-slate-700 mb-0.5">Username (ชื่อผู้ใช้)</label>
+          <input type="text" id="loginUsername" required placeholder="เช่น top หรือ admin47" autocomplete="username" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
         </div>
         <div>
-          <label class="block font-medium text-slate-700 mb-0.5">รหัสผ่าน</label>
-          <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
+          <label class="block font-medium text-slate-700 mb-0.5">Password (รหัสผ่าน)</label>
+          <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
         </div>
         <div id="loginErrorMsg" class="hidden p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px]"></div>
-        <button type="submit" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg shadow transition touch-active text-sm">เข้าสู่ระบบ</button>
+        <button type="submit" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg shadow transition touch-active text-sm">เข้าสู่ระบบผู้ดูแล</button>
       </form>
       <div class="pt-2 text-center border-t border-slate-100">
         <button type="button" onclick="openDevPanelPrompt()" class="text-[11px] text-slate-400 hover:text-slate-600 underline">🛠️ เข้าสู่ Dev Panel (สำหรับผู้พัฒนากดอนุมัติ)</button>
@@ -283,32 +283,29 @@
     <!-- Tab: Register -->
     <div id="authTabRegister" class="hidden p-4 space-y-3 text-xs">
       <div class="flex bg-slate-100 p-0.5 rounded-lg">
-        <button onclick="showAuthTab('login')" id="tabBtnLogin2" class="flex-1 py-1.5 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-700">เข้าสู่ระบบ</button>
+        <button onclick="showAuthTab('login')" id="tabBtnLogin2" class="flex-1 py-1.5 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-700">เข้าสู่ระบบผู้ดูแล</button>
         <button onclick="showAuthTab('register')" id="tabBtnRegister2" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition bg-white text-sky-700 shadow-sm">สมัครผู้ดูแลใหม่</button>
-      </div>
-      <div class="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-amber-800 text-[11px]">
-        ⚠️ บัญชีที่สมัครใหม่ต้องรอ <strong>Dev อนุมัติสิทธิ์</strong> ก่อนถึงจะเข้าใช้โหมดแอดมินได้
       </div>
       <form onsubmit="handleRegister(event)" class="space-y-2.5">
         <div>
-          <label class="block font-medium text-slate-700 mb-0.5">อีเมล</label>
-          <input type="email" id="regEmail" required placeholder="yourname@example.com" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
+          <label class="block font-medium text-slate-700 mb-0.5">Username (ชื่อผู้ใช้)</label>
+          <input type="text" id="regUsername" required placeholder="เช่น top47 หรือ beer" autocomplete="username" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
         </div>
         <div>
-          <label class="block font-medium text-slate-700 mb-0.5">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
-          <input type="password" id="regPassword" required minlength="6" placeholder="••••••••" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
+          <label class="block font-medium text-slate-700 mb-0.5">Password (รหัสผ่าน 6 ตัวขึ้นไป)</label>
+          <input type="password" id="regPassword" required minlength="6" placeholder="••••••••" autocomplete="new-password" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
         </div>
         <div>
-          <label class="block font-medium text-slate-700 mb-0.5">ชื่อที่แสดง (Display Name)</label>
-          <input type="text" id="regDisplayName" required placeholder="เช่น Admin สมชาย" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
+          <label class="block font-medium text-slate-700 mb-0.5">Name (ชื่อผู้ดูแล / ฉายา)</label>
+          <input type="text" id="regDisplayName" required placeholder="เช่น K.Top หรือ แอดมินท็อป" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm">
         </div>
         <div class="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
-          <label class="block font-semibold text-emerald-900 mb-0.5">🔑 รหัสลับ Dev (ถ้ามี เพื่อเป็น Admin ทันที)</label>
-          <input type="password" id="regDevCode" placeholder="ใส่รหัสลับ Dev (เช่น 4747)" class="w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white">
-          <p class="text-[10px] text-emerald-700 mt-1">💡 ถ้ามีรหัสลับจาก Dev ใส่ตรงนี้จะได้รับการอนุมัติเป็น Admin ทันที ไม่ต้องรอ</p>
+          <label class="block font-semibold text-emerald-900 mb-0.5">🔑 Dev Code (รหัสลับ Dev)</label>
+          <input type="password" id="regDevCode" required placeholder="กรอก Dev Code (เช่น 4747)" class="w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white font-medium">
+          <p class="text-[10px] text-emerald-700 mt-1">💡 ใส่ Dev Code ที่ถูกต้องเพื่อเปิดสิทธิ์ Admin ทันที (ค่าเริ่มต้น: 4747)</p>
         </div>
         <div id="regErrorMsg" class="hidden p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px]"></div>
-        <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow transition touch-active text-sm">สมัครบัญชีผู้ดูแล</button>
+        <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow transition touch-active text-sm">สมัครเป็นผู้ดูแล</button>
       </form>
       <div class="pt-2 text-center border-t border-slate-100">
         <button type="button" onclick="openDevPanelPrompt()" class="text-[11px] text-slate-400 hover:text-slate-600 underline">🛠️ เข้าสู่ Dev Panel (สำหรับผู้พัฒนากดอนุมัติ)</button>
@@ -636,7 +633,8 @@ function updateAuthUI() {
     // Approved admin: show toolbar + badge, hide login button
     signedBadge.classList.remove('hidden');
     signedBadge.classList.add('flex');
-    document.getElementById('adminEmailLabel').textContent = currentUser.email;
+    const uName = currentUser.displayName || emailToUsername(currentUser.email);
+    document.getElementById('adminEmailLabel').textContent = `${uName} (Admin)`;
     authBtn.classList.add('hidden');
     toolbar.classList.remove('hidden');
     document.querySelectorAll('.admin-col').forEach(el => el.style.display = '');
@@ -644,12 +642,13 @@ function updateAuthUI() {
     // Logged in but NOT approved: hide everything admin, show badge as pending
     signedBadge.classList.remove('hidden');
     signedBadge.classList.add('flex');
-    document.getElementById('adminEmailLabel').textContent = currentUser.email + ' (รออนุมัติ)';
+    const uName = currentUser.displayName || emailToUsername(currentUser.email);
+    document.getElementById('adminEmailLabel').textContent = `${uName} (รออนุมัติ)`;
     authBtn.classList.add('hidden');
     toolbar.classList.add('hidden');
     document.querySelectorAll('.admin-col').forEach(el => el.style.display = 'none');
   } else {
-    // Not logged in: hide all admin UI
+    // Not logged in: hide all admin UI (General users see nothing)
     signedBadge.classList.add('hidden');
     signedBadge.classList.remove('flex');
     authBtn.classList.remove('hidden');
@@ -661,11 +660,23 @@ function updateAuthUI() {
 // Dev Master Passcode (for instant approval & in-app approval panel)
 const DEV_MASTER_KEY = "4747";
 
+// Username to safe Firebase Auth email mapping (User never sees the domain)
+function usernameToEmail(u) {
+  const clean = encodeURIComponent((u || '').trim().toLowerCase().replace(/\s+/g, '_'));
+  return `${clean}@47manage.local`;
+}
+
+function emailToUsername(email) {
+  if (!email) return '';
+  const at = email.indexOf('@');
+  return at > -1 ? decodeURIComponent(email.substring(0, at)) : email;
+}
+
 // ========== AUTH MODAL ==========
 function openAuthModal() {
   if (currentUser && !isApprovedAdmin) {
     showAuthTab('pending');
-    document.getElementById('pendingEmail').textContent = currentUser.email;
+    document.getElementById('pendingEmail').textContent = currentUser.displayName || emailToUsername(currentUser.email);
   } else {
     showAuthTab('login');
   }
@@ -683,15 +694,15 @@ function showAuthTab(tab) {
 
 async function handleLogin(e) {
   e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
+  const username = document.getElementById('loginUsername').value.trim();
   const pass = document.getElementById('loginPassword').value;
   const errDiv = document.getElementById('loginErrorMsg');
   errDiv.classList.add('hidden');
   try {
-    await auth.signInWithEmailAndPassword(email, pass);
+    await auth.signInWithEmailAndPassword(usernameToEmail(username), pass);
     closeAuthModal();
   } catch(err) {
-    errDiv.textContent = err.code === 'auth/user-not-found' ? 'ไม่พบบัญชีนี้ กรุณาสมัครใหม่ก่อน' :
+    errDiv.textContent = err.code === 'auth/user-not-found' ? 'ไม่พบชื่อผู้ใช้นี้ กรุณาสมัครเป็นผู้ดูแลก่อน' :
       err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' ? 'รหัสผ่านไม่ถูกต้อง' :
       'เข้าสู่ระบบไม่สำเร็จ: ' + err.message;
     errDiv.classList.remove('hidden');
@@ -700,52 +711,55 @@ async function handleLogin(e) {
 
 async function handleRegister(e) {
   e.preventDefault();
-  const email = document.getElementById('regEmail').value;
+  const username = document.getElementById('regUsername').value.trim();
   const pass = document.getElementById('regPassword').value;
-  const displayName = document.getElementById('regDisplayName').value;
+  const displayName = document.getElementById('regDisplayName').value.trim();
   const devCode = document.getElementById('regDevCode').value.trim();
   const errDiv = document.getElementById('regErrorMsg');
   errDiv.classList.add('hidden');
 
-  try {
-    const cred = await auth.createUserWithEmailAndPassword(email, pass);
-    await cred.user.updateProfile({ displayName });
+  if (username.length < 2) {
+    errDiv.textContent = 'กรุณาตั้ง Username อย่างน้อย 2 ตัวอักษร';
+    errDiv.classList.remove('hidden');
+    return;
+  }
 
-    if (devCode === DEV_MASTER_KEY) {
-      // 1-Step Instant Auto-Approval!
-      await db.collection("approved_admins").doc(cred.user.uid).set({
-        uid: cred.user.uid,
-        email: email,
-        displayName: displayName,
-        approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        approvedVia: 'dev_code'
-      });
-      await db.collection("admin_requests").doc(cred.user.uid).set({
-        uid: cred.user.uid,
-        email: email,
-        displayName: displayName,
-        requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'approved'
-      });
-      isApprovedAdmin = true;
-      alert('🎉 รหัสลับ Dev ถูกต้อง! บัญชีของคุณได้รับการอนุมัติเป็น Admin เรียบร้อยแล้วทันที');
-      closeAuthModal();
-      updateAuthUI();
-      renderAll();
-    } else {
-      // Normal request -> wait for approval
-      await db.collection("admin_requests").doc(cred.user.uid).set({
-        uid: cred.user.uid,
-        email: email,
-        displayName: displayName,
-        requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'pending'
-      });
-      document.getElementById('pendingEmail').textContent = email;
-      showAuthTab('pending');
-    }
+  // Dev Code validation: must match DEV_MASTER_KEY
+  if (devCode !== DEV_MASTER_KEY) {
+    errDiv.textContent = '❌ Dev Code ไม่ถูกต้อง กรุณากรอกรหัส Dev Code ที่ได้รับจาก Dev (เช่น 4747)';
+    errDiv.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const email = usernameToEmail(username);
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await cred.user.updateProfile({ displayName: displayName });
+
+    // Instantly approved with Dev Code!
+    await db.collection("approved_admins").doc(cred.user.uid).set({
+      uid: cred.user.uid,
+      username: username,
+      email: email,
+      displayName: displayName,
+      approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      approvedVia: 'dev_code'
+    });
+    await db.collection("admin_requests").doc(cred.user.uid).set({
+      uid: cred.user.uid,
+      username: username,
+      email: email,
+      displayName: displayName,
+      requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'approved'
+    });
+    isApprovedAdmin = true;
+    alert(`🎉 สมัครผู้ดูแลสำเร็จ!\nยินดีต้อนรับ ${displayName} (@${username}) เข้าสู่โหมดแอดมิน`);
+    closeAuthModal();
+    updateAuthUI();
+    renderAll();
   } catch(err) {
-    errDiv.textContent = err.code === 'auth/email-already-in-use' ? 'อีเมลนี้ถูกใช้แล้ว ลองเข้าสู่ระบบแทน' : err.message;
+    errDiv.textContent = err.code === 'auth/email-already-in-use' ? 'ชื่อผู้ใช้ (Username) นี้ถูกใช้งานแล้ว กรุณาเลือกชื่ออื่น' : err.message;
     errDiv.classList.remove('hidden');
   }
 }
@@ -755,21 +769,23 @@ async function handleQuickUnlock() {
   const code = document.getElementById('pendingDevCode').value.trim();
   if (code === DEV_MASTER_KEY) {
     try {
+      const uName = currentUser.displayName || emailToUsername(currentUser.email);
       await db.collection("approved_admins").doc(currentUser.uid).set({
         uid: currentUser.uid,
+        username: emailToUsername(currentUser.email),
+        displayName: uName,
         email: currentUser.email,
-        displayName: currentUser.displayName || '',
         approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
         approvedVia: 'quick_unlock'
       });
       await db.collection("admin_requests").doc(currentUser.uid).set({
         uid: currentUser.uid,
-        email: currentUser.email,
-        displayName: currentUser.displayName || '',
+        username: emailToUsername(currentUser.email),
+        displayName: uName,
         status: 'approved'
       }, { merge: true });
       isApprovedAdmin = true;
-      alert('🎉 รหัสลับถูกต้อง! ปลดล็อคสิทธิ์ Admin สำเร็จ');
+      alert('🎉 ปลดล็อคสำเร็จ! ยินดีต้อนรับสู่โหมดแอดมิน');
       closeAuthModal();
       updateAuthUI();
       renderAll();
@@ -777,12 +793,12 @@ async function handleQuickUnlock() {
       alert('เกิดข้อผิดพลาด: ' + err.message);
     }
   } else {
-    alert('❌ รหัสลับ Dev ไม่ถูกต้อง กรุณาตรวจสอบรหัสอีกครั้ง');
+    alert('❌ Dev Code ไม่ถูกต้อง');
   }
 }
 
 function openDevPanelPrompt() {
-  const entered = prompt('🔐 กรุณากรอก Dev Master Key เพื่อเข้าหน้าจัดการอนุมัติ:\n(ค่าเริ่มต้นคือ: 4747)');
+  const entered = prompt('🔐 กรุณากรอก Dev Code เพื่อเข้าหน้าจัดการอนุมัติ:\n(ค่าเริ่มต้นคือ: 4747)');
   if (entered === DEV_MASTER_KEY) {
     showAuthTab('devPanel');
     loadDevRequestsList();
@@ -807,20 +823,21 @@ function loadDevRequestsList() {
     listEl.innerHTML = snap.docs.map(doc => {
       const data = doc.data();
       const isApproved = data.status === 'approved';
+      const displayUname = data.username || emailToUsername(data.email);
       return `
         <div class="p-2.5 rounded-xl border ${isApproved ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200'} flex items-center justify-between gap-2">
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="font-bold text-slate-800 truncate">${data.displayName || 'Admin'}</span>
+              <span class="text-[10px] text-slate-500 font-mono">(@${displayUname})</span>
               <span class="text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${isApproved ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
                 ${isApproved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
               </span>
             </div>
-            <p class="text-[11px] text-slate-500 truncate">${data.email}</p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             ${!isApproved ? `
-              <button onclick="approveUserByDev('${data.uid}','${data.email}','${data.displayName||''}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-[11px] transition touch-active">
+              <button onclick="approveUserByDev('${data.uid}','${data.username||''}','${data.displayName||''}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-[11px] transition touch-active">
                 ✅ อนุมัติ
               </button>
             ` : `
@@ -840,19 +857,19 @@ function loadDevRequestsList() {
   });
 }
 
-async function approveUserByDev(uid, email, displayName) {
+async function approveUserByDev(uid, username, displayName) {
   try {
     await db.collection("approved_admins").doc(uid).set({
       uid: uid,
-      email: email,
+      username: username,
       displayName: displayName,
       approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
       approvedBy: 'dev_panel'
-    });
+    }, { merge: true });
     await db.collection("admin_requests").doc(uid).set({
       status: 'approved'
     }, { merge: true });
-    alert(`🎉 อนุมัติสิทธิ์ Admin ให้ ${email} เรียบร้อยแล้ว!`);
+    alert(`🎉 อนุมัติสิทธิ์ Admin ให้ ${displayName} (@${username}) เรียบร้อยแล้ว!`);
   } catch(err) {
     alert('อนุมัติไม่สำเร็จ: ' + err.message);
   }
