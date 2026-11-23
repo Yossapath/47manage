@@ -11,11 +11,13 @@ import {
   orderBy,
   serverTimestamp,
   setDoc,
-  getDocs
+  getDocs,
+  where
 } from "firebase/firestore";
 
 type Role = "admin" | "member";
 type Page = "overview" | "payments" | "members" | "reports" | "logs" | "settings";
+type AuthView = "login" | "register";
 
 type Player = {
   id: string;
@@ -23,6 +25,34 @@ type Player = {
   color: string;
 };
 
+// ---- NEW: Dungeon Difficulty System ----
+// A Tier is a price-slot within a difficulty, e.g. "1-3 (฿200)" or "4-5 (฿300)"
+type DungeonTier = {
+  label: string;   // e.g. "1-3", "4-5", "1-5", "เต็มรอบ"
+  price: number;   // price for this tier in THB
+};
+
+// A Difficulty = one mode within a dungeon, e.g. "Nightmare" or "Hell", with its own tiers
+type DungeonDifficulty = {
+  name: string;       // e.g. "Nightmare", "Hell", "Infinite", "ระดับเดียว"
+  tiers: DungeonTier[];
+};
+
+// A DungeonTemplate = one dungeon with multiple difficulties
+type DungeonTemplate = {
+  id: string;         // unique id
+  name: string;       // e.g. "Apo", "Maya95"
+  difficulties: DungeonDifficulty[];
+};
+
+// Segment for runs where different players carried different tiers
+type RunSegment = {
+  tierLabel: string;   // e.g. "1-3", "4-5"
+  price: number;       // e.g. 200, 300
+  players: string[];   // player IDs who played this tier
+};
+
+// Legacy flat preset kept for backward compat display only
 type DungeonPreset = {
   name: string;
   price: number;
@@ -32,12 +62,15 @@ type PaymentRow = {
   id: string;
   date: string;
   time: string;
-  dungeon: string;
+  dungeon: string;        // e.g. "Apo"
+  difficulty: string;     // e.g. "Nightmare"
+  tier: string;           // e.g. "1-3" or "1-3 + 4-5"
   ctm: string;
   price: number;
   detail: string;
   sale: number;
-  players: string[];
+  players: string[];      // all players involved
+  segments?: RunSegment[]; // if split across tiers with different players
   commissionTo: string;
   slip?: string;
   createdAt?: any;
@@ -51,6 +84,81 @@ type LogItem = {
   target: string;
   type: string;
 };
+
+// ---- Default Dungeon Templates ----
+const DEFAULT_DUNGEON_TEMPLATES: DungeonTemplate[] = [
+  {
+    id: "apo",
+    name: "Apo",
+    difficulties: [
+      {
+        name: "Nightmare",
+        tiers: [
+          { label: "1-3", price: 200 },
+          { label: "4-5", price: 300 },
+          { label: "1-5", price: 500 },
+          { label: "5",   price: 200 },
+        ],
+      },
+      {
+        name: "Hell",
+        tiers: [
+          { label: "1-3", price: 400 },
+          { label: "4-5", price: 600 },
+          { label: "1-5", price: 1000 },
+          { label: "5",   price: 400 },
+        ],
+      },
+      {
+        name: "Infinite",
+        tiers: [
+          { label: "1-3", price: 800 },
+          { label: "4-5", price: 1200 },
+          { label: "1-5", price: 2000 },
+        ],
+      },
+    ],
+  },
+  {
+    id: "maya95",
+    name: "Maya95",
+    difficulties: [
+      {
+        name: "ระดับเดียว",
+        tiers: [{ label: "เต็มรอบ", price: 300 }],
+      },
+    ],
+  },
+];
+
+function genId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+// Calculate the precise wage for a specific player in a given run
+function getPlayerWageForRun(
+  row: PaymentRow,
+  playerId: string,
+  commissionRate: number,
+  defaultCarryCount: number
+): number {
+  const comMult = 1 - commissionRate / 100;
+  if (row.segments && row.segments.length > 0) {
+    let wage = 0;
+    for (const seg of row.segments) {
+      if (seg.players.includes(playerId)) {
+        const count = seg.players.length || 1;
+        wage += (seg.price * comMult) / count;
+      }
+    }
+    return wage;
+  }
+  if (row.players.includes(playerId)) {
+    const count = row.players.length || defaultCarryCount;
+    return (row.sale * comMult) / count;
+  }
+  return 0;
+}
 
 const DEFAULT_PLAYERS: Player[] = [
   { id: "p1", name: "K.Top", color: "#6557D9" },
@@ -107,35 +215,133 @@ const icons = {
   search: <Icon size={16}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>,
   download: <Icon size={16}><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" /></Icon>,
   trash: <Icon size={15}><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></Icon>,
-  image: <Icon size={16}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></Icon>
+  image: <Icon size={16}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></Icon>,
+  menu: <Icon size={20}><path d="M4 6h16M4 12h16M4 18h16" /></Icon>,
+  x: <Icon size={18}><path d="M18 6 6 18M6 6l12 12" /></Icon>,
+  user: <Icon size={16}><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></Icon>,
+  lock: <Icon size={16}><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></Icon>,
+  info: <Icon size={16}><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></Icon>,
 };
 
-// ======================== LOGIN COMPONENT ========================
+// ======================== LOGIN + REGISTER COMPONENT ========================
 function Login({ onLogin }: { onLogin: (role: Role, username: string) => void }) {
+  const [view, setView] = useState<AuthView>("login");
   const [role, setRole] = useState<Role>("admin");
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  // Register fields
+  const [regUsername, setRegUsername] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirm, setRegConfirm] = useState("");
+
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+    setLoading(true);
 
     if (role === "admin") {
-      const savedAdminPass = localStorage.getItem("47manage_admin_pass") || "admin";
       if (!username.trim()) {
         setErrorMsg("กรุณากรอกชื่อผู้ใช้");
+        setLoading(false);
         return;
       }
+
+      // Try Firestore users collection first
+      try {
+        const snap = await getDocs(query(
+          collection(db, "users"),
+          where("username", "==", username.trim()),
+          where("role", "==", "admin")
+        ));
+        if (!snap.empty) {
+          const userData = snap.docs[0].data();
+          if (userData.password === password) {
+            setLoading(false);
+            onLogin("admin", username.trim());
+            return;
+          }
+        }
+      } catch (_) { /* fallback below */ }
+
+      // Fallback: hardcoded passwords
+      const savedAdminPass = localStorage.getItem("47manage_admin_pass") || "admin";
       if (password === savedAdminPass || password === "47family" || password === "admin") {
+        setLoading(false);
         onLogin("admin", username.trim());
       } else {
-        setErrorMsg("รหัสผ่านไม่ถูกต้อง (รหัสเริ่มต้น: admin หรือ 47family)");
+        setErrorMsg("รหัสผ่านไม่ถูกต้อง");
+        setLoading(false);
       }
     } else {
+      // Member login — check Firestore users collection
+      try {
+        const snap = await getDocs(query(
+          collection(db, "users"),
+          where("username", "==", username.trim())
+        ));
+        if (!snap.empty) {
+          const userData = snap.docs[0].data();
+          if (userData.password === password) {
+            const memberRole = userData.role as Role;
+            setLoading(false);
+            onLogin(memberRole, username.trim());
+            return;
+          } else {
+            setErrorMsg("รหัสผ่านไม่ถูกต้อง");
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (_) { /* fall through */ }
+
+      // Allow view-only without password
       const memberName = username.trim() || "สมาชิกทั่วไป";
+      setLoading(false);
       onLogin("member", memberName);
+    }
+  };
+
+  const handleRegister = async (e: FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    if (!regUsername.trim()) { setErrorMsg("กรุณากรอกชื่อผู้ใช้"); return; }
+    if (regPassword.length < 4) { setErrorMsg("รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร"); return; }
+    if (regPassword !== regConfirm) { setErrorMsg("รหัสผ่านไม่ตรงกัน"); return; }
+
+    setLoading(true);
+    try {
+      // Check if username already exists
+      const existing = await getDocs(query(
+        collection(db, "users"),
+        where("username", "==", regUsername.trim())
+      ));
+      if (!existing.empty) {
+        setErrorMsg("ชื่อผู้ใช้นี้มีอยู่แล้ว กรุณาเลือกชื่ออื่น");
+        setLoading(false);
+        return;
+      }
+
+      await addDoc(collection(db, "users"), {
+        username: regUsername.trim(),
+        password: regPassword,
+        role: "member",
+        createdAt: serverTimestamp()
+      });
+
+      setSuccessMsg(`สมัครสำเร็จ! บัญชี "${regUsername.trim()}" ได้รับยศ Member แล้ว กรุณาเข้าสู่ระบบ`);
+      setRegUsername(""); setRegPassword(""); setRegConfirm("");
+      setLoading(false);
+      setTimeout(() => { setView("login"); setSuccessMsg(""); }, 2500);
+    } catch (err: any) {
+      setErrorMsg("สมัครไม่สำเร็จ: " + err.message);
+      setLoading(false);
     }
   };
 
@@ -148,74 +354,100 @@ function Login({ onLogin }: { onLogin: (role: Role, username: string) => void })
       <section className="login-card">
         <div className="login-heading">
           <span className="eyebrow">ระบบจัดการกิลด์</span>
-          <h1>เข้าสู่ระบบจัดการ<br />ค่าตอบแทน</h1>
-          <p>ตรวจสอบและจัดการรายได้ของทีมอย่างโปร่งใส</p>
+          <h1>{view === "login" ? <>เข้าสู่ระบบจัดการ<br />ค่าตอบแทน</> : <>สมัครสมาชิก<br />ใหม่</>}</h1>
+          <p>{view === "login" ? "ตรวจสอบและจัดการรายได้ของทีมอย่างโปร่งใส" : "สร้างบัญชีใหม่เพื่อเข้าดูข้อมูลรายได้ทีม"}</p>
         </div>
 
-        <div className="role-switch">
-          <button
-            type="button"
-            className={role === "admin" ? "active" : ""}
-            onClick={() => { setRole("admin"); setUsername("admin"); setErrorMsg(""); }}
-          >
-            ผู้ดูแลระบบ (Admin)
+        {/* Login / Register Tab */}
+        <div className="role-switch" style={{ marginBottom: "16px" }}>
+          <button type="button" className={view === "login" ? "active" : ""} onClick={() => { setView("login"); setErrorMsg(""); setSuccessMsg(""); }}>
+            เข้าสู่ระบบ
           </button>
-          <button
-            type="button"
-            className={role === "member" ? "active" : ""}
-            onClick={() => { setRole("member"); setUsername("Member"); setErrorMsg(""); }}
-          >
-            สมาชิก (ดูอย่างเดียว)
+          <button type="button" className={view === "register" ? "active" : ""} onClick={() => { setView("register"); setErrorMsg(""); setSuccessMsg(""); }}>
+            สมัครสมาชิก
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <label className="field">
-            <span>{role === "admin" ? "ชื่อผู้ใช้ (Username)" : "ชื่อของคุณ (หรือปล่อยว่าง)"}</span>
-            <input
-              type="text"
-              required={role === "admin"}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={role === "admin" ? "เช่น admin" : "ชื่อสมาชิก"}
-            />
-          </label>
+        {view === "login" ? (
+          <>
+            <div className="role-switch">
+              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => { setRole("admin"); setUsername("admin"); setErrorMsg(""); }}>
+                ผู้ดูแลระบบ (Admin)
+              </button>
+              <button type="button" className={role === "member" ? "active" : ""} onClick={() => { setRole("member"); setUsername(""); setErrorMsg(""); }}>
+                สมาชิก (Member)
+              </button>
+            </div>
 
-          {role === "admin" && (
+            <form onSubmit={handleLogin}>
+              <label className="field">
+                <span>{role === "admin" ? "ชื่อผู้ใช้ (Username)" : "ชื่อผู้ใช้ (หรือปล่อยว่าง)"}</span>
+                <input
+                  type="text"
+                  required={role === "admin"}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={role === "admin" ? "เช่น admin" : "ชื่อสมาชิก"}
+                />
+              </label>
+
+              <label className="field">
+                <span>รหัสผ่าน (Password){role === "member" ? " (ถ้ามี)" : ""}</span>
+                <div className="password-wrap">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required={role === "admin"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="กรอกรหัสผ่าน"
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? "ซ่อน" : "แสดง"}
+                  </button>
+                </div>
+              </label>
+
+              {errorMsg && <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>⚠️ {errorMsg}</p>}
+
+              <button type="submit" className="login-button" disabled={loading}>
+                {loading ? "กำลังตรวจสอบ..." : role === "admin" ? "เข้าสู่ระบบผู้ดูแล" : "เข้าใช้งาน"}
+                {!loading && <span>{icons.chevron}</span>}
+              </button>
+            </form>
+            <p className="demo-note">
+              {role === "admin"
+                ? "💡 บัญชีผู้ดูแล: รหัสเริ่มต้นคือ admin หรือ 47family"
+                : "👀 สมัครแล้วจะได้ยศ Member · ติดต่อ Admin เพื่ออัปเกรด"}
+            </p>
+          </>
+        ) : (
+          <form onSubmit={handleRegister}>
+            <label className="field">
+              <span>ชื่อผู้ใช้ (Username)</span>
+              <input required autoFocus value={regUsername} onChange={(e) => setRegUsername(e.target.value)} placeholder="เช่น K.Arm หรือ newnick" />
+            </label>
             <label className="field">
               <span>รหัสผ่าน (Password)</span>
               <div className="password-wrap">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="กรอกรหัสผ่าน"
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? "ซ่อน" : "แสดง"}
-                </button>
+                <input type={showPassword ? "text" : "password"} required value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="อย่างน้อย 4 ตัวอักษร" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "ซ่อน" : "แสดง"}</button>
               </div>
             </label>
-          )}
+            <label className="field">
+              <span>ยืนยันรหัสผ่าน</span>
+              <input type={showPassword ? "text" : "password"} required value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)} placeholder="กรอกรหัสผ่านอีกครั้ง" />
+            </label>
 
-          {errorMsg && (
-            <p style={{ color: "#d9534f", fontSize: "11px", marginBottom: "12px", textAlign: "center" }}>
-              ⚠️ {errorMsg}
-            </p>
-          )}
+            {errorMsg && <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>⚠️ {errorMsg}</p>}
+            {successMsg && <p style={{ color: "#27ae60", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>✅ {successMsg}</p>}
 
-          <button type="submit" className="login-button">
-            {role === "admin" ? "เข้าสู่ระบบผู้ดูแล" : "เข้าใช้งานในฐานะสมาชิก (ดูอย่างเดียว)"}
-            <span>{icons.chevron}</span>
-          </button>
-        </form>
-
-        <p className="demo-note">
-          {role === "admin"
-            ? "💡 บัญชีผู้ดูแล: รหัสเริ่มต้นคือ admin หรือ 47family (เปลี่ยนได้ในหน้าตั้งค่า)"
-            : "👀 สมาชิกทั่วไป: เข้าดูตาราง ยอดเงิน และสลิปได้แบบ Read-only"}
-        </p>
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? "กำลังสมัคร..." : "สมัครสมาชิก (ได้รับยศ Member)"}
+              {!loading && <span>{icons.chevron}</span>}
+            </button>
+            <p className="demo-note">📋 Admin จะอัปเกรด Role ให้ทาง Firestore Console</p>
+          </form>
+        )}
       </section>
       <p className="login-footer">47RAVENGE © 2026 · ระบบจัดการค่าตอบแทนสมาชิก</p>
     </main>
@@ -236,16 +468,169 @@ function PlayerAvatar({ player, small = false }: { player?: Player; small?: bool
   );
 }
 
+// ======================== PLAYER DETAIL MODAL ========================
+function PlayerDetailModal({
+  row,
+  memberList,
+  commissionRate,
+  defaultCarryCount,
+  onClose
+}: {
+  row: PaymentRow;
+  memberList: Player[];
+  commissionRate: number;
+  defaultCarryCount: number;
+  onClose: () => void;
+}) {
+  const carryCount = row.players.length || defaultCarryCount;
+  const totalSale = row.sale;
+  const totalCom = (totalSale * commissionRate) / 100;
+  const totalWagePool = totalSale - totalCom;
+
+  const comPlayer = memberList.find((p) => p.name === row.commissionTo);
+  const diffLabel = [row.difficulty, row.tier].filter(Boolean).join(" · ");
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div
+        className="modal"
+        style={{ width: "520px", maxHeight: "90vh" }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="modal-close" onClick={onClose}>×</button>
+        <span className="eyebrow">รายละเอียดการลงดันเจี้ยน</span>
+        <h2 style={{ fontSize: "18px", margin: "4px 0 2px" }}>
+          {row.dungeon} {diffLabel && <span style={{ color: "#176bca", fontSize: "14px" }}>({diffLabel})</span>}
+        </h2>
+        <p style={{ fontSize: "12px", color: "#777", marginBottom: "16px" }}>{row.date} · {row.time} น. · CTM: <strong>{row.ctm}</strong></p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "18px" }}>
+          <div style={{ background: "#f0f6fc", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
+            <small style={{ color: "#888", fontSize: "11px" }}>ยอดขายรวม</small>
+            <strong style={{ display: "block", fontSize: "16px", color: "#172033" }}>฿{totalSale.toLocaleString()}</strong>
+          </div>
+          <div style={{ background: "#fdf3e7", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
+            <small style={{ color: "#888", fontSize: "11px" }}>ค่าคอม {commissionRate}%</small>
+            <strong style={{ display: "block", fontSize: "16px", color: "#e67e22" }}>฿{Math.round(totalCom).toLocaleString()}</strong>
+          </div>
+          <div style={{ background: "#edfdf5", borderRadius: "8px", padding: "12px", textAlign: "center" }}>
+            <small style={{ color: "#888", fontSize: "11px" }}>กองกลางค่าแรง</small>
+            <strong style={{ display: "block", fontSize: "16px", color: "#27ae60" }}>฿{Math.round(totalWagePool).toLocaleString()}</strong>
+          </div>
+        </div>
+
+        {/* Commission recipient */}
+        <div style={{ background: "#fef9ec", border: "1px solid #f0d080", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "18px" }}>💰</span>
+          <div>
+            <small style={{ color: "#888", fontSize: "11px" }}>ผู้รับค่าคอมมิชชั่น</small>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+              {comPlayer && <PlayerAvatar player={comPlayer} small />}
+              <strong style={{ fontSize: "13px" }}>{row.commissionTo}</strong>
+              <span style={{ color: "#e67e22", fontWeight: 700, fontSize: "13px" }}>฿{Math.round(totalCom).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Multi-Tier breakdown if exists */}
+        {row.segments && row.segments.length > 0 && (
+          <div style={{ marginBottom: "16px", background: "#f4f8fd", border: "1px solid #c9e0f8", borderRadius: "8px", padding: "12px" }}>
+            <strong style={{ fontSize: "13px", display: "block", color: "#176bca", marginBottom: "8px" }}>
+              🔀 การแบ่งช่วงชั้นและคนลง (Multi-Tier Breakdown)
+            </strong>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {row.segments.map((seg, idx) => {
+                const segNet = seg.price * (1 - commissionRate / 100);
+                const segPerPerson = segNet / (seg.players.length || 1);
+                return (
+                  <div key={idx} style={{ background: "#fff", border: "1px solid #e1eaf3", borderRadius: "6px", padding: "8px 12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <strong style={{ fontSize: "13px", color: "#2c3e50" }}>
+                        ชั้น {seg.tierLabel} (฿{seg.price.toLocaleString()})
+                      </strong>
+                      <span style={{ fontSize: "12px", color: "#27ae60", fontWeight: 700 }}>
+                        แบ่งคนละ ฿{Math.round(segPerPerson).toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#666", marginTop: "3px" }}>
+                      ทีมแบกช่วงนี้: {seg.players.map((pid) => memberList.find((m) => m.id === pid)?.name || pid).join(", ") || "-"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Per-player breakdown */}
+        <strong style={{ fontSize: "13px", display: "block", marginBottom: "10px" }}>
+          รายรับสุทธิของทีมแบก ({row.players.length} คน)
+        </strong>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "240px", overflowY: "auto" }}>
+          {row.players.map((pid, idx) => {
+            const p = memberList.find((m) => m.id === pid);
+            const playerWage = getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount);
+            return (
+              <div
+                key={pid + idx}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 14px",
+                  background: "#f9fbfd",
+                  borderRadius: "8px",
+                  border: "1px solid #e8edf3"
+                }}
+              >
+                <PlayerAvatar player={p} />
+                <div style={{ flex: 1 }}>
+                  <strong style={{ fontSize: "13px" }}>{p?.name || pid}</strong>
+                  <small style={{ display: "block", color: "#888", fontSize: "11px" }}>
+                    {row.segments && row.segments.length > 0
+                      ? `ลงชั้น: ${row.segments.filter((s) => s.players.includes(pid)).map((s) => s.tierLabel).join(", ") || "-"}`
+                      : "ทีมแบก"}
+                  </small>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <strong style={{ fontSize: "15px", color: "#27ae60" }}>฿{Math.round(playerWage).toLocaleString()}</strong>
+                  <small style={{ display: "block", color: "#aaa", fontSize: "10px" }}>สุทธิหลังหักคอม</small>
+                </div>
+              </div>
+            );
+          })}
+          {row.players.length === 0 && (
+            <p style={{ color: "#aaa", fontSize: "12px", textAlign: "center", padding: "20px" }}>ไม่มีข้อมูลทีมแบก</p>
+          )}
+        </div>
+
+        {/* Slip */}
+        {row.slip && (
+          <div style={{ marginTop: "16px" }}>
+            <strong style={{ fontSize: "13px", display: "block", marginBottom: "8px" }}>🧾 สลิปการโอนเงิน</strong>
+            <img src={row.slip} alt="Slip" style={{ width: "100%", borderRadius: "8px", border: "1px solid #ddd" }} />
+          </div>
+        )}
+
+        <button type="button" className="outline-button" style={{ marginTop: "16px", width: "100%" }} onClick={onClose}>
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ======================== DASHBOARD COMPONENT ========================
 function Dashboard({ role, username, onLogout }: { role: Role; username: string; onLogout: () => void }) {
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [memberList, setMemberList] = useState<Player[]>(DEFAULT_PLAYERS);
-  const [dungeons, setDungeons] = useState<DungeonPreset[]>(DEFAULT_DUNGEONS);
+  const [dungeonTemplates, setDungeonTemplates] = useState<DungeonTemplate[]>(DEFAULT_DUNGEON_TEMPLATES);
   const [defaultCarryCount, setDefaultCarryCount] = useState<number>(4);
   const [commissionRate, setCommissionRate] = useState<number>(10);
   const [adminPass, setAdminPass] = useState<string>("admin");
 
   const [page, setPage] = useState<Page>("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedDungeonFilter, setSelectedDungeonFilter] = useState("ทั้งหมด");
   const [dateFilter, setDateFilter] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -254,6 +639,12 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [currentSlipBase64, setCurrentSlipBase64] = useState<string>("");
   const [viewSlipUrl, setViewSlipUrl] = useState<string | null>(null);
+
+  // Payment form selectors
+  const [formDungeonId, setFormDungeonId] = useState<string>("");
+  const [formDiffName, setFormDiffName] = useState<string>("");
+  const [formTierLabel, setFormTierLabel] = useState<string>("");
+  const [formSaleOverride, setFormSaleOverride] = useState<number>(0);
 
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
@@ -264,9 +655,12 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   const [logs, setLogs] = useState<LogItem[]>([]);
 
   // Settings temp state
-  const [newDungeonName, setNewDungeonName] = useState("");
-  const [newDungeonPrice, setNewDungeonPrice] = useState("");
   const [tempAdminPass, setTempAdminPass] = useState("");
+  // New dungeon template builder state
+  const [newDungeonName, setNewDungeonName] = useState("");
+  const [newDiffName, setNewDiffName] = useState("");
+  const [newTiers, setNewTiers] = useState<DungeonTier[]>([{ label: "", price: 0 }]);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   const notify = (message: string) => {
     setToast(message);
@@ -300,11 +694,13 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
           id: d.id,
           date: val.date || "23-Nov",
           time: val.time || "21:00",
-          dungeon: val.dungeon || val.detail || "Apo NM 1-5",
+          dungeon: val.dungeon || val.detail || "Apo",
+          difficulty: val.difficulty || "",
+          tier: val.tier || "",
           ctm: val.ctm || val.customer || "-",
           price: Number(val.price || val.sale) || 0,
           sale: Number(val.sale || val.price) || 0,
-          detail: val.detail || val.dungeon || "",
+          detail: val.detail || "",
           commissionTo: val.commissionTo || val.saleBy || "-",
           players: Array.isArray(val.players) ? val.players : (Array.isArray(val.carryPlayers) ? val.carryPlayers : []),
           slip: val.slip || val.slipUrl || undefined,
@@ -324,7 +720,6 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
         });
         setMemberList(data);
       } else {
-        // initialize default if empty
         setMemberList(DEFAULT_PLAYERS);
       }
     });
@@ -342,8 +737,9 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     const unsubDungeons = onSnapshot(doc(db, "settings", "dungeons"), (docSnap) => {
       if (docSnap.exists()) {
         const val = docSnap.data();
-        if (Array.isArray(val.list) && val.list.length > 0) {
-          setDungeons(val.list);
+        // Load new dungeon template system
+        if (Array.isArray(val.templates) && val.templates.length > 0) {
+          setDungeonTemplates(val.templates);
         }
       }
     });
@@ -389,13 +785,46 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   const payout = total - commission;
   const activePlayerIds = new Set(filteredRows.flatMap((row) => row.players));
 
+  // Derived flat list of dungeon names for filter dropdowns
+  const allDungeonNames = useMemo(() =>
+    Array.from(new Set(rows.map((r) => r.dungeon).filter(Boolean))),
+    [rows]
+  );
+
+  // Derived: selected dungeon template & difficulty
+  const selectedTemplate = useMemo(() =>
+    dungeonTemplates.find((t) => t.id === formDungeonId) || dungeonTemplates[0],
+    [dungeonTemplates, formDungeonId]
+  );
+  const selectedDiff = useMemo(() =>
+    selectedTemplate?.difficulties.find((d) => d.name === formDiffName) || selectedTemplate?.difficulties[0],
+    [selectedTemplate, formDiffName]
+  );
+  const selectedTier = useMemo(() =>
+    selectedDiff?.tiers.find((t) => t.label === formTierLabel) || selectedDiff?.tiers[0],
+    [selectedDiff, formTierLabel]
+  );
+
+  // Weekly income summary (all rows, no filter)
+  const weeklySummary = useMemo(() => {
+    return memberList
+      .map((p) => {
+        const pRuns = rows.filter((r) => r.players.includes(p.id));
+        const wage = pRuns.reduce((sum, r) => sum + (r.sale * (1 - commissionRate / 100)) / (r.players.length || defaultCarryCount), 0);
+        const com = rows.filter((r) => r.commissionTo === p.name).reduce((sum, r) => sum + (r.sale * commissionRate) / 100, 0);
+        return { ...p, rounds: pRuns.length, wage, com, grand: wage + com };
+      })
+      .filter((p) => p.grand > 0)
+      .sort((a, b) => b.grand - a.grand);
+  }, [rows, memberList, commissionRate, defaultCarryCount]);
+
   const pageTitles: Record<Page, [string, string]> = {
     overview: ["ภาพรวมค่าตอบแทน", "ติดตามรายได้ ส่วนแบ่งของทีม และสถิติล่าสุด"],
     payments: ["รายการค่าตอบแทน", "จัดการรายการเล่น สลิป และส่วนแบ่งทั้งหมด"],
     members: ["สมาชิกทีม", "รายชื่อสมาชิกและยอดรายได้สะสมของแต่ละคน"],
     reports: ["รายงานสรุป", "วิเคราะห์ยอดขาย ค่าคอม และส่วนแบ่งผู้เล่น"],
     logs: ["Log History", "ประวัติการใช้งานและการเปลี่ยนแปลงในระบบ"],
-    settings: ["ตั้งค่าระบบ", "กำหนดรายชื่อดันเจี้ยน จำนวนคนแบก และกติกา"],
+    settings: ["ตั้งค่าระบบ", "กำหนดรายชื่อดันเจี้ยน ความยาก ราคา และกติกา"],
   };
 
   const toggleSelectedPlayer = (playerId: string) => {
@@ -407,12 +836,23 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   const openAdd = () => {
     setSelectedPlayers([]);
     setCurrentSlipBase64("");
+    const firstTemplate = dungeonTemplates[0];
+    setFormDungeonId(firstTemplate?.id || "");
+    setFormDiffName(firstTemplate?.difficulties[0]?.name || "");
+    setFormTierLabel(firstTemplate?.difficulties[0]?.tiers[0]?.label || "");
+    setFormSaleOverride(firstTemplate?.difficulties[0]?.tiers[0]?.price || 0);
     setShowAdd(true);
   };
 
   const openEdit = (row: PaymentRow) => {
     setSelectedPlayers(row.players);
     setCurrentSlipBase64(row.slip || "");
+    // Try to match template
+    const tmpl = dungeonTemplates.find((t) => t.name === row.dungeon);
+    setFormDungeonId(tmpl?.id || "");
+    setFormDiffName(row.difficulty || "");
+    setFormTierLabel(row.tier || "");
+    setFormSaleOverride(row.sale);
     setEditRow(row);
   };
 
@@ -448,18 +888,25 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
       return;
     }
     const data = new FormData(event.currentTarget);
-    const saleAmount = Number(data.get("sale")) || 0;
-    const dungeonName = String(data.get("dungeon"));
+    const saleAmount = Number(data.get("sale")) || formSaleOverride || 0;
     const ctmName = String(data.get("ctm"));
     const detailText = String(data.get("detail"));
     const dateVal = String(data.get("date"));
     const timeVal = String(data.get("time"));
     const commissionToVal = String(data.get("commissionTo"));
 
+    // Build dungeon label: "Apo · Nightmare · 1-3"
+    const tmpl = dungeonTemplates.find((t) => t.id === formDungeonId);
+    const dungeonName = tmpl?.name || "ไม่ระบุ";
+    const diffName = formDiffName || "";
+    const tierLbl = formTierLabel || "";
+
     const payload = {
       date: dateVal,
       time: timeVal,
       dungeon: dungeonName,
+      difficulty: diffName,
+      tier: tierLbl,
       ctm: ctmName,
       customer: ctmName,
       price: saleAmount,
@@ -474,17 +921,18 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
       updatedAt: serverTimestamp(),
     };
 
+    const displayLabel = [dungeonName, diffName, tierLbl].filter(Boolean).join(" · ");
     try {
       if (editRow) {
         await updateDoc(doc(db, "runs", editRow.id), payload);
-        await addLog("แก้ไขรายการ", `${dungeonName} (฿${saleAmount}) - ${ctmName}`, "แก้ไข");
+        await addLog("แก้ไขรายการ", `${displayLabel} (฿${saleAmount}) - ${ctmName}`, "แก้ไข");
         notify("บันทึกการแก้ไขรอบแล้ว");
       } else {
         await addDoc(collection(db, "runs"), {
           ...payload,
           createdAt: serverTimestamp()
         });
-        await addLog("เพิ่มรายการใหม่", `${dungeonName} (฿${saleAmount}) - ${ctmName}`, "สร้าง");
+        await addLog("เพิ่มรายการใหม่", `${displayLabel} (฿${saleAmount}) - ${ctmName}`, "สร้าง");
         notify("เพิ่มรอบดันเจี้ยนใหม่เรียบร้อยแล้ว");
       }
       setShowAdd(false);
@@ -508,7 +956,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     }
   };
 
-  // ======================== ADD MEMBER (NO EMAIL REQUIRED) ========================
+  // ======================== ADD MEMBER ========================
   const addMember = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!newMemberName.trim()) {
@@ -532,32 +980,74 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   };
 
   // ======================== SETTINGS HANDLERS ========================
-  const handleAddDungeon = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!newDungeonName.trim()) return;
-    const price = Number(newDungeonPrice) || 0;
-    const updated = [...dungeons, { name: newDungeonName.trim(), price }];
+  const saveDungeonTemplates = async (updated: DungeonTemplate[]) => {
     try {
-      await setDoc(doc(db, "settings", "dungeons"), { list: updated });
-      await addLog("เพิ่มดันเจี้ยนในระบบ", `${newDungeonName} (฿${price})`, "ระบบ");
-      notify(`เพิ่มดันเจี้ยน "${newDungeonName}" สำเร็จ`);
-      setNewDungeonName("");
-      setNewDungeonPrice("");
+      await setDoc(doc(db, "settings", "dungeons"), { templates: updated });
+      setDungeonTemplates(updated);
     } catch (err: any) {
       alert("เกิดข้อผิดพลาด: " + err.message);
     }
   };
 
-  const handleDeleteDungeon = async (name: string) => {
-    if (!confirm(`ยืนยันลบดันเจี้ยน "${name}" ออกจากระบบ?`)) return;
-    const updated = dungeons.filter((d) => d.name !== name);
-    try {
-      await setDoc(doc(db, "settings", "dungeons"), { list: updated });
-      await addLog("ลบดันเจี้ยน", name, "ระบบ");
-      notify(`ลบดันเจี้ยน "${name}" แล้ว`);
-    } catch (err: any) {
-      alert("เกิดข้อผิดพลาด: " + err.message);
-    }
+  const handleAddDungeonTemplate = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newDungeonName.trim()) return;
+    const newTemplate: DungeonTemplate = {
+      id: genId(),
+      name: newDungeonName.trim(),
+      difficulties: [],
+    };
+    const updated = [...dungeonTemplates, newTemplate];
+    await saveDungeonTemplates(updated);
+    await addLog("เพิ่มดันเจี้ยน", newDungeonName.trim(), "ระบบ");
+    notify(`เพิ่มดันเจี้ยน "${newDungeonName}" สำเร็จ`);
+    setNewDungeonName("");
+    setEditingTemplateId(newTemplate.id);
+  };
+
+  const handleDeleteDungeonTemplate = async (id: string) => {
+    const tmpl = dungeonTemplates.find((t) => t.id === id);
+    if (!tmpl) return;
+    if (!confirm(`ยืนยันลบดันเจี้ยน "${tmpl.name}" ออกจากระบบ?`)) return;
+    const updated = dungeonTemplates.filter((t) => t.id !== id);
+    await saveDungeonTemplates(updated);
+    await addLog("ลบดันเจี้ยน", tmpl.name, "ระบบ");
+    notify(`ลบดันเจี้ยน "${tmpl.name}" แล้ว`);
+    if (editingTemplateId === id) setEditingTemplateId(null);
+  };
+
+  const handleAddDifficulty = async (templateId: string) => {
+    if (!newDiffName.trim()) { notify("กรุณากรอกชื่อความยาก"); return; }
+    if (!newTiers.some((t) => t.label.trim())) { notify("กรุณากรอก Tier อย่างน้อย 1 ชั้น"); return; }
+    const updated = dungeonTemplates.map((t) => {
+      if (t.id !== templateId) return t;
+      return {
+        ...t,
+        difficulties: [
+          ...t.difficulties,
+          {
+            name: newDiffName.trim(),
+            tiers: newTiers.filter((ti) => ti.label.trim()).map((ti) => ({ label: ti.label.trim(), price: ti.price })),
+          },
+        ],
+      };
+    });
+    await saveDungeonTemplates(updated);
+    const tmpl = dungeonTemplates.find((t) => t.id === templateId);
+    await addLog("เพิ่มความยาก", `${tmpl?.name} · ${newDiffName}`, "ระบบ");
+    notify(`เพิ่มความยาก "${newDiffName}" สำเร็จ`);
+    setNewDiffName("");
+    setNewTiers([{ label: "", price: 0 }]);
+  };
+
+  const handleDeleteDifficulty = async (templateId: string, diffName: string) => {
+    if (!confirm(`ยืนยันลบความยาก "${diffName}"?`)) return;
+    const updated = dungeonTemplates.map((t) => {
+      if (t.id !== templateId) return t;
+      return { ...t, difficulties: t.difficulties.filter((d) => d.name !== diffName) };
+    });
+    await saveDungeonTemplates(updated);
+    notify(`ลบความยาก "${diffName}" แล้ว`);
   };
 
   const handleSaveGeneralSettings = async (e: FormEvent) => {
@@ -581,57 +1071,110 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     }
   };
 
+  // Shared table row renderer
+  const renderTableRow = (row: PaymentRow, showManage: boolean) => {
+    const carryCount = row.players.length || defaultCarryCount;
+    const perPlayer = (row.sale * (1 - commissionRate / 100)) / carryCount;
+    const diffLabel = [row.difficulty, row.tier].filter(Boolean).join(" · ");
+    return (
+      <tr key={row.id}>
+        <td>
+          <strong>{row.date}</strong>
+          <small>{row.time} น.</small>
+        </td>
+        <td>
+          <span className="dungeon-name">{row.dungeon}</span>
+          {diffLabel && <small style={{ color: "#6080a8" }}>{diffLabel}</small>}
+        </td>
+        <td><strong>{row.ctm}</strong></td>
+        <td>{row.detail}</td>
+        <td className="money">฿{row.sale.toLocaleString()}</td>
+        <td className="commission">-฿{((row.sale * commissionRate) / 100).toLocaleString()} <small>({row.commissionTo})</small></td>
+        <td className="players-cell">
+          <button className="player-names" onClick={() => setSelectedRow(row)}>
+            {row.players.map((id) => memberList.find((p) => p.id === id)?.name || id).join(", ") || "-"}
+          </button>
+        </td>
+        <td className="payout">฿{Math.round(perPlayer).toLocaleString()}</td>
+        <td>
+          {row.slip ? (
+            <button type="button" onClick={() => setViewSlipUrl(row.slip!)} style={{ color: "#176bca", fontWeight: 700, fontSize: "12px", textDecoration: "underline" }}>
+              ดูสลิป
+            </button>
+          ) : <span style={{ color: "#ccc" }}>-</span>}
+        </td>
+        {showManage && (
+          <td>
+            <button className="more-button" onClick={() => openEdit(row)} title="แก้ไข">•••</button>
+          </td>
+        )}
+      </tr>
+    );
+  };
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
       {/* ======================== SIDEBAR ======================== */}
       <aside className="sidebar">
         <div className="side-brand">
           <div className="brand-mark mini"><span>47</span></div>
-          <div><strong>47RAVENGE</strong><small>Reward Management</small></div>
+          {sidebarOpen && <div><strong>47RAVENGE</strong><small>Reward Management</small></div>}
         </div>
 
+        <button
+          className="sidebar-toggle"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          title={sidebarOpen ? "หุบเมนู" : "ขยายเมนู"}
+        >
+          {sidebarOpen ? icons.x : icons.menu}
+        </button>
+
         <nav>
-          <span className="nav-label">เมนูหลัก</span>
-          <button className={`nav-item ${page === "overview" ? "active" : ""}`} onClick={() => setPage("overview")}>
-            {icons.grid}<span>ภาพรวม</span>
+          {sidebarOpen && <span className="nav-label">เมนูหลัก</span>}
+          <button className={`nav-item ${page === "overview" ? "active" : ""}`} onClick={() => setPage("overview")} title="ภาพรวม">
+            {icons.grid}{sidebarOpen && <span>ภาพรวม</span>}
           </button>
-          <button className={`nav-item ${page === "payments" ? "active" : ""}`} onClick={() => setPage("payments")}>
-            {icons.table}<span>รายการค่าตอบแทน</span><b>{rows.length}</b>
+          <button className={`nav-item ${page === "payments" ? "active" : ""}`} onClick={() => setPage("payments")} title="รายการค่าตอบแทน">
+            {icons.table}{sidebarOpen && <span>รายการค่าตอบแทน</span>}{sidebarOpen && <b>{rows.length}</b>}
           </button>
-          <button className={`nav-item ${page === "members" ? "active" : ""}`} onClick={() => setPage("members")}>
-            {icons.users}<span>สมาชิกทีม</span><b>{memberList.length}</b>
+          <button className={`nav-item ${page === "members" ? "active" : ""}`} onClick={() => setPage("members")} title="สมาชิกทีม">
+            {icons.users}{sidebarOpen && <span>สมาชิกทีม</span>}{sidebarOpen && <b>{memberList.length}</b>}
           </button>
-          <button className={`nav-item ${page === "reports" ? "active" : ""}`} onClick={() => setPage("reports")}>
-            {icons.chart}<span>รายงานสรุป</span>
+          <button className={`nav-item ${page === "reports" ? "active" : ""}`} onClick={() => setPage("reports")} title="รายงานสรุป">
+            {icons.chart}{sidebarOpen && <span>รายงานสรุป</span>}
           </button>
-          <button className={`nav-item ${page === "logs" ? "active" : ""}`} onClick={() => setPage("logs")}>
-            {icons.history}<span>Log History</span>
+          <button className={`nav-item ${page === "logs" ? "active" : ""}`} onClick={() => setPage("logs")} title="Log History">
+            {icons.history}{sidebarOpen && <span>Log History</span>}
           </button>
 
           {role === "admin" && (
             <>
-              <span className="nav-label second">ผู้ดูแลระบบ</span>
-              <button className={`nav-item ${page === "settings" ? "active" : ""}`} onClick={() => setPage("settings")}>
-                {icons.settings}<span>ตั้งค่าระบบ</span>
+              {sidebarOpen && <span className="nav-label second">ผู้ดูแลระบบ</span>}
+              <button className={`nav-item ${page === "settings" ? "active" : ""}`} onClick={() => setPage("settings")} title="ตั้งค่าระบบ">
+                {icons.settings}{sidebarOpen && <span>ตั้งค่าระบบ</span>}
               </button>
             </>
           )}
         </nav>
 
-        <div className="commission-rule">
-          <span>กติกาการแบ่งเงิน</span>
-          <strong>หักค่าคอมมิชชั่น {commissionRate}%</strong>
-          <p>ยอดคงเหลือแบ่งเท่ากัน {defaultCarryCount} คนแบกในแต่ละรอบ</p>
-        </div>
+        {sidebarOpen && (
+          <div className="commission-rule">
+            <span>กติกาการแบ่งเงิน</span>
+            <strong>หักค่าคอมมิชชั่น {commissionRate}%</strong>
+            <p>ยอดคงเหลือแบ่งเท่ากัน {defaultCarryCount} คนแบกในแต่ละรอบ</p>
+          </div>
+        )}
 
         <div className="profile">
           <div className="profile-avatar">{username.slice(0, 2).toUpperCase()}</div>
-          <div>
-            <strong>{username}</strong>
-            <small style={{ color: role === "admin" ? "#176bca" : "#666" }}>
-              {role === "admin" ? "🛡️ ผู้ดูแลระบบ" : "👀 สมาชิก (ดูอย่างเดียว)"}
-            </small>
-          </div>
+          {sidebarOpen && (
+            <div>
+              <strong>{username}</strong>
+              <small style={{ color: role === "admin" ? "#176bca" : "#666" }}>
+                {role === "admin" ? "🛡️ ผู้ดูแลระบบ" : "👀 สมาชิก"}
+              </small>
+            </div>
+          )}
           <button onClick={onLogout} title="ออกจากระบบ">{icons.logout}</button>
         </div>
       </aside>
@@ -702,7 +1245,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     {icons.filter}
                     <select value={selectedDungeonFilter} onChange={(e) => setSelectedDungeonFilter(e.target.value)}>
                       <option value="ทั้งหมด">ทุกดันเจี้ยน</option>
-                      {dungeons.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+                      {allDungeonNames.map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </label>
                 </div>
@@ -712,7 +1255,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   <thead>
                     <tr>
                       <th>วันที่ / เวลา</th>
-                      <th>ดันเจี้ยน</th>
+                      <th>ดันเจี้ยน · ความยาก · Tier</th>
                       <th>ลูกค้า (CTM)</th>
                       <th>รายละเอียด</th>
                       <th>ยอดขาย</th>
@@ -731,55 +1274,63 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                         </td>
                       </tr>
                     ) : (
-                      filteredRows.slice(0, 10).map((row) => {
-                        const carryCount = row.players.length || defaultCarryCount;
-                        const perPlayer = (row.sale * (1 - commissionRate / 100)) / carryCount;
-                        return (
-                          <tr key={row.id}>
-                            <td>
-                              <strong>{row.date}</strong>
-                              <small>{row.time} น.</small>
-                            </td>
-                            <td>
-                              <span className="dungeon-name">{row.dungeon}</span>
-                              <small>{row.detail}</small>
-                            </td>
-                            <td><strong>{row.ctm}</strong></td>
-                            <td>{row.detail}</td>
-                            <td className="money">฿{row.sale.toLocaleString()}</td>
-                            <td className="commission">-฿{((row.sale * commissionRate) / 100).toLocaleString()} <small>({row.commissionTo})</small></td>
-                            <td className="players-cell">
-                              <button className="player-names" onClick={() => setSelectedRow(row)}>
-                                {row.players.map((id) => memberList.find((p) => p.id === id)?.name || id).join(", ") || "-"}
-                              </button>
-                            </td>
-                            <td className="payout">฿{Math.round(perPlayer).toLocaleString()}</td>
-                            <td>
-                              {row.slip ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setViewSlipUrl(row.slip!)}
-                                  style={{ color: "#176bca", fontWeight: 700, fontSize: "11px", textDecoration: "underline" }}
-                                >
-                                  ดูสลิป
-                                </button>
-                              ) : <span style={{ color: "#ccc" }}>-</span>}
-                            </td>
-                            {role === "admin" && (
-                              <td>
-                                <button className="more-button" onClick={() => openEdit(row)} title="แก้ไข">
-                                  •••
-                                </button>
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })
+                      filteredRows.slice(0, 10).map((row) => renderTableRow(row, role === "admin"))
                     )}
                   </tbody>
                 </table>
               </div>
             </section>
+
+            {/* ===== WEEKLY INCOME SUMMARY ===== */}
+            {weeklySummary.length > 0 && (
+              <section className="content-card">
+                <div className="table-heading">
+                  <div>
+                    <h2>สรุปส่วนแบ่ง รายได้ผู้เล่นประจำสัปดาห์</h2>
+                    <p>คำนวณจากค่าแรงหารเท่า + ค่าคอมมิชชั่นสะสมทั้งหมด</p>
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>อันดับ</th>
+                        <th>ชื่อผู้เล่น</th>
+                        <th>จำนวนรอบ</th>
+                        <th>ค่าแรงหารเท่า</th>
+                        <th>ค่าคอม {commissionRate}%</th>
+                        <th>รายรับสุทธิรวม</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklySummary.map((p, idx) => (
+                        <tr key={p.id}>
+                          <td><strong>{idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}</strong></td>
+                          <td>
+                            <div className="name-cell">
+                              <PlayerAvatar player={p} small />
+                              <strong>{p.name}</strong>
+                            </div>
+                          </td>
+                          <td>{p.rounds} รอบ</td>
+                          <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{Math.round(p.wage).toLocaleString()}</td>
+                          <td style={{ color: "#176bca", fontWeight: 700 }}>฿{Math.round(p.com).toLocaleString()}</td>
+                          <td className="money" style={{ fontSize: "14px" }}>฿{Math.round(p.grand).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={3} style={{ fontWeight: 700, fontSize: "13px", color: "#172033" }}>รวมทั้งหมด</td>
+                        <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{Math.round(weeklySummary.reduce((s, p) => s + p.wage, 0)).toLocaleString()}</td>
+                        <td style={{ color: "#176bca", fontWeight: 700 }}>฿{Math.round(weeklySummary.reduce((s, p) => s + p.com, 0)).toLocaleString()}</td>
+                        <td className="money" style={{ fontSize: "14px" }}>฿{Math.round(weeklySummary.reduce((s, p) => s + p.grand, 0)).toLocaleString()}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </section>
+            )}
           </>
         )}
 
@@ -797,13 +1348,13 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   placeholder="ค้นหาวันที่ (เช่น 23-Nov)..."
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  style={{ height: "35px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 10px", fontSize: "11px" }}
+                  style={{ height: "35px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 10px", fontSize: "12px" }}
                 />
                 <label>
                   {icons.filter}
                   <select value={selectedDungeonFilter} onChange={(e) => setSelectedDungeonFilter(e.target.value)}>
                     <option value="ทั้งหมด">ทุกดันเจี้ยน</option>
-                    {dungeons.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+                    {allDungeonNames.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
               </div>
@@ -832,50 +1383,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                       </td>
                     </tr>
                   ) : (
-                    filteredRows.map((row) => {
-                      const carryCount = row.players.length || defaultCarryCount;
-                      const perPlayer = (row.sale * (1 - commissionRate / 100)) / carryCount;
-                      return (
-                        <tr key={row.id}>
-                          <td>
-                            <strong>{row.date}</strong>
-                            <small>{row.time} น.</small>
-                          </td>
-                          <td>
-                            <span className="dungeon-name">{row.dungeon}</span>
-                            <small>{row.detail}</small>
-                          </td>
-                          <td><strong>{row.ctm}</strong></td>
-                          <td>{row.detail}</td>
-                          <td className="money">฿{row.sale.toLocaleString()}</td>
-                          <td className="commission">-฿{((row.sale * commissionRate) / 100).toLocaleString()} <small>({row.commissionTo})</small></td>
-                          <td className="players-cell">
-                            <button className="player-names" onClick={() => setSelectedRow(row)}>
-                              {row.players.map((id) => memberList.find((p) => p.id === id)?.name || id).join(", ") || "-"}
-                            </button>
-                          </td>
-                          <td className="payout">฿{Math.round(perPlayer).toLocaleString()}</td>
-                          <td>
-                            {row.slip ? (
-                              <button
-                                type="button"
-                                onClick={() => setViewSlipUrl(row.slip!)}
-                                style={{ color: "#176bca", fontWeight: 700, fontSize: "11px", textDecoration: "underline" }}
-                              >
-                                ดูสลิป
-                              </button>
-                            ) : <span style={{ color: "#ccc" }}>-</span>}
-                          </td>
-                          {role === "admin" && (
-                            <td>
-                              <button className="more-button" onClick={() => openEdit(row)} title="แก้ไข">
-                                •••
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })
+                    filteredRows.map((row) => renderTableRow(row, role === "admin"))
                   )}
                 </tbody>
               </table>
@@ -913,7 +1421,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   style={{ marginLeft: "auto" }}
                   onClick={() => setShowMemberForm(true)}
                 >
-                  {icons.plus} เพิ่มสมาชิกใหม่ (ไม่ต้องกรอกอีเมล)
+                  {icons.plus} เพิ่มสมาชิกใหม่
                 </button>
               )}
             </div>
@@ -947,8 +1455,16 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                           <strong>{playerRuns.length} รอบ</strong>
                         </div>
                         <div>
-                          <span>รายได้รวม</span>
-                          <strong>฿{Math.round(income + comIncome).toLocaleString()}</strong>
+                          <span>ค่าแรง</span>
+                          <strong style={{ color: "#27ae60" }}>฿{Math.round(income).toLocaleString()}</strong>
+                        </div>
+                        <div>
+                          <span>ค่าคอม</span>
+                          <strong style={{ color: "#176bca" }}>฿{Math.round(comIncome).toLocaleString()}</strong>
+                        </div>
+                        <div>
+                          <span>รวมทั้งสิ้น</span>
+                          <strong className="money">฿{Math.round(income + comIncome).toLocaleString()}</strong>
                         </div>
                       </div>
                       <button
@@ -957,7 +1473,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                           setSelectedDungeonFilter("ทั้งหมด");
                           setDateFilter("");
                           setPage("payments");
-                          notify(`กำลังแสดงรายการของ ${player.name}`);
+                          notify(`กำลังแสดงรายการทั้งหมด`);
                         }}
                       >
                         ดูรายการลงดันเจี้ยน
@@ -1035,7 +1551,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                   </div>
                   <div className="legend">
                     <span><i className="blue"></i> กองกลางค่าแรง <b>฿{payout.toLocaleString()}</b></span>
-                    <span><i className="light"></i> ค่าคอม 10% <b>฿{commission.toLocaleString()}</b></span>
+                    <span><i className="light"></i> ค่าคอม {commissionRate}% <b>฿{commission.toLocaleString()}</b></span>
                   </div>
                 </div>
               </article>
@@ -1046,7 +1562,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
               <div className="table-heading">
                 <div>
                   <h2>อันดับรายรับสุทธิสมาชิก</h2>
-                  <p>คำนวณจากค่าแรงที่หารเท่า + ค่าคอมมิชชั่น 10% ของแต่ละคน</p>
+                  <p>คำนวณจากค่าแรงที่หารเท่า + ค่าคอมมิชชั่น {commissionRate}% ของแต่ละคน</p>
                 </div>
               </div>
               <div className="table-wrap">
@@ -1057,7 +1573,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                       <th>ชื่อสมาชิก</th>
                       <th>จำนวนรอบ</th>
                       <th>ค่าแรงหารเท่า</th>
-                      <th>ค่าคอม 10%</th>
+                      <th>ค่าคอม {commissionRate}%</th>
                       <th>รายรับสุทธิ</th>
                     </tr>
                   </thead>
@@ -1082,7 +1598,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                           <td>{p.rounds} รอบ</td>
                           <td style={{ color: "#27ae60", fontWeight: 700 }}>฿{Math.round(p.wage).toLocaleString()}</td>
                           <td style={{ color: "#176bca", fontWeight: 700 }}>฿{Math.round(p.com).toLocaleString()}</td>
-                          <td className="money" style={{ fontSize: "13px" }}>฿{Math.round(p.grand).toLocaleString()}</td>
+                          <td className="money" style={{ fontSize: "14px" }}>฿{Math.round(p.grand).toLocaleString()}</td>
                         </tr>
                       ))}
                   </tbody>
@@ -1152,71 +1668,136 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
         {page === "settings" && role === "admin" && (
           <section className="page-stack">
             <div className="settings-layout">
-              {/* Card 1: Dungeon Management */}
+              {/* Card 1: Dungeon Template Management */}
               <div className="settings-card full">
                 <div className="settings-title">
                   <div className="settings-icon">🏰</div>
                   <div>
-                    <h2>ตั้งค่ารายชื่อดันเจี้ยนและราคามาตรฐาน</h2>
-                    <p>กำหนดรายชื่อดันเจี้ยนที่จะให้เลือกในฟอร์มบันทึกรอบ</p>
+                    <h2>จัดการดันเจี้ยน ความยาก และราคา</h2>
+                    <p>สร้างดันเจี้ยน เพิ่มความยาก (NM/Hell/Infinite) และกำหนดราคาแต่ละ Tier</p>
                   </div>
                 </div>
 
-                <div style={{ marginTop: "16px" }}>
-                  <form onSubmit={handleAddDungeon} style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
-                    <input
-                      type="text"
-                      placeholder="ชื่อดันเจี้ยนใหม่ (เช่น Apo NM 1-5)"
-                      required
-                      value={newDungeonName}
-                      onChange={(e) => setNewDungeonName(e.target.value)}
-                      style={{ flex: 2, height: "38px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 12px", fontSize: "11px" }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="ราคาเริ่มต้น (บาท)"
-                      required
-                      min="0"
-                      value={newDungeonPrice}
-                      onChange={(e) => setNewDungeonPrice(e.target.value)}
-                      style={{ flex: 1, height: "38px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 12px", fontSize: "11px" }}
-                    />
-                    <button type="submit" className="primary-button" style={{ height: "38px" }}>
-                      + เพิ่มดันเจี้ยน
-                    </button>
-                  </form>
+                {/* Add new dungeon */}
+                <form onSubmit={handleAddDungeonTemplate} style={{ display: "flex", gap: "10px", margin: "16px 0", flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    placeholder="ชื่อดันเจี้ยนใหม่ (เช่น Apo, Maya95)"
+                    required
+                    value={newDungeonName}
+                    onChange={(e) => setNewDungeonName(e.target.value)}
+                    style={{ flex: 2, height: "38px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 12px", fontSize: "13px" }}
+                  />
+                  <button type="submit" className="primary-button" style={{ height: "38px" }}>
+                    + เพิ่มดันเจี้ยนใหม่
+                  </button>
+                </form>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "10px" }}>
-                    {dungeons.map((d) => (
-                      <div
-                        key={d.name}
-                        style={{
-                          padding: "10px 14px",
-                          border: "1px solid #e1e7ee",
-                          borderRadius: "6px",
-                          background: "#f9fbfd",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between"
-                        }}
-                      >
-                        <div>
-                          <strong style={{ fontSize: "12px", color: "#172033" }}>{d.name}</strong>
-                          <span style={{ display: "block", fontSize: "10px", color: "#176bca", fontWeight: 700 }}>
-                            ฿{d.price.toLocaleString()}
-                          </span>
-                        </div>
+                {/* Dungeon list */}
+                <div className="dungeon-tree">
+                  {dungeonTemplates.map((tmpl) => (
+                    <div key={tmpl.id} className="dungeon-group">
+                      {/* Header */}
+                      <div className="dungeon-group-header" onClick={() => setEditingTemplateId(editingTemplateId === tmpl.id ? null : tmpl.id)}>
+                        <span className="dungeon-group-name">🏰 {tmpl.name}</span>
+                        <span className="dungeon-group-badge">{tmpl.difficulties.length} ความยาก</span>
                         <button
                           type="button"
-                          onClick={() => handleDeleteDungeon(d.name)}
-                          style={{ border: 0, background: "none", color: "#d9534f", cursor: "pointer" }}
-                          title="ลบดันเจี้ยนนี้"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteDungeonTemplate(tmpl.id); }}
+                          style={{ border: 0, background: "none", color: "#d9534f", cursor: "pointer", marginLeft: "8px" }}
                         >
                           {icons.trash}
                         </button>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Difficulties list */}
+                      {tmpl.difficulties.length > 0 && (
+                        <div className="dungeon-difficulty-list">
+                          {tmpl.difficulties.map((diff) => (
+                            <div key={diff.name} className="dungeon-difficulty-row">
+                              <span className="diff-name">{diff.name || "ระดับเดียว"}</span>
+                              <div className="diff-tiers">
+                                {diff.tiers.map((tier) => (
+                                  <span key={tier.label} className="diff-tier-chip">
+                                    ชั้น {tier.label} · <strong>฿{tier.price.toLocaleString()}</strong>
+                                  </span>
+                                ))}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDifficulty(tmpl.id, diff.name)}
+                                style={{ border: 0, background: "none", color: "#bbb", cursor: "pointer" }}
+                              >
+                                {icons.trash}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add difficulty panel (expanded) */}
+                      {editingTemplateId === tmpl.id && (
+                        <div className="dungeon-add-panel">
+                          <h4>+ เพิ่มความยากให้ {tmpl.name}</h4>
+                          <label className="field">
+                            <span>ชื่อความยาก (เช่น Nightmare, Hell, Infinite หรือปล่อยว่างถ้ามีระดับเดียว)</span>
+                            <input
+                              type="text"
+                              value={newDiffName}
+                              onChange={(e) => setNewDiffName(e.target.value)}
+                              placeholder="เช่น Nightmare"
+                            />
+                          </label>
+                          <strong style={{ fontSize: "12px", display: "block", margin: "10px 0 6px" }}>Tiers และราคา (เพิ่มหลายแถวได้)</strong>
+                          {newTiers.map((tier, idx) => (
+                            <div key={idx} className="tier-row">
+                              <input
+                                type="text"
+                                placeholder="ชั้น (เช่น 1-3, 4-5, 1-5)"
+                                value={tier.label}
+                                onChange={(e) => { const t = [...newTiers]; t[idx] = { ...t[idx], label: e.target.value }; setNewTiers(t); }}
+                              />
+                              <input
+                                type="number"
+                                placeholder="ราคา (฿)"
+                                min={0}
+                                value={tier.price || ""}
+                                onChange={(e) => { const t = [...newTiers]; t[idx] = { ...t[idx], price: Number(e.target.value) }; setNewTiers(t); }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setNewTiers(newTiers.filter((_, i) => i !== idx))}
+                                style={{ border: 0, background: "none", color: "#bbb", cursor: "pointer" }}
+                              >✕</button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            className="outline-button"
+                            style={{ marginTop: "8px" }}
+                            onClick={() => setNewTiers([...newTiers, { label: "", price: 0 }])}
+                          >
+                            + เพิ่ม Tier
+                          </button>
+                          <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTemplateId(null)}
+                              style={{ border: "1px solid #ddd", borderRadius: "4px", padding: "0 14px", height: "36px", background: "#fff" }}
+                            >ยกเลิก</button>
+                            <button
+                              type="button"
+                              className="primary-button"
+                              onClick={() => handleAddDifficulty(tmpl.id)}
+                            >บันทึกความยาก</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {dungeonTemplates.length === 0 && (
+                    <p style={{ color: "#aaa", textAlign: "center", padding: "20px" }}>ยังไม่มีดันเจี้ยน — เพิ่มดันเจี้ยนแรกด้านบน</p>
+                  )}
                 </div>
               </div>
 
@@ -1297,11 +1878,35 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     <span>เข้าตรวจสอบตาราง ยอดเงิน รายได้สะสม สลิปการโอน และดูประวัติได้อย่างโปร่งใส (ดูอย่างเดียว)</span>
                   </div>
                 </div>
+
+                <div style={{ marginTop: "14px", padding: "12px 14px", background: "#f0f7ff", borderRadius: "8px", border: "1px solid #c8dff8" }}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                    {icons.info}
+                    <div>
+                      <strong style={{ fontSize: "12px", display: "block" }}>การจัดการ Role ผู้ใช้</strong>
+                      <small style={{ color: "#555", lineHeight: 1.5, display: "block", marginTop: "2px" }}>
+                        สมาชิกที่สมัครผ่านหน้า Register จะได้ยศ <code>member</code> โดยอัตโนมัติ<br />
+                        Admin สามารถอัปเกรด Role เป็น <code>admin</code> ได้ผ่าน Firebase Console → users collection
+                      </small>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
         )}
       </main>
+
+      {/* ======================== MODAL: PLAYER DETAIL ======================== */}
+      {selectedRow && (
+        <PlayerDetailModal
+          row={selectedRow}
+          memberList={memberList}
+          commissionRate={commissionRate}
+          defaultCarryCount={defaultCarryCount}
+          onClose={() => setSelectedRow(null)}
+        />
+      )}
 
       {/* ======================== MODAL: ADD / EDIT PAYMENT ======================== */}
       {(showAdd || editRow) && (
@@ -1329,24 +1934,66 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                 </label>
               </div>
 
+              {/* Level 1: Dungeon */}
               <label className="field">
-                <span>ดันเจี้ยน / ด่าน</span>
+                <span>ดันเจี้ยน</span>
                 <select
-                  name="dungeon"
-                  defaultValue={editRow?.dungeon ?? dungeons[0]?.name}
+                  value={formDungeonId}
                   onChange={(e) => {
-                    const found = dungeons.find((d) => d.name === e.target.value);
-                    if (found) {
-                      const saleInput = document.querySelector('input[name="sale"]') as HTMLInputElement;
-                      if (saleInput) saleInput.value = String(found.price);
-                    }
+                    const tmpl = dungeonTemplates.find((t) => t.id === e.target.value);
+                    setFormDungeonId(e.target.value);
+                    const firstDiff = tmpl?.difficulties[0];
+                    setFormDiffName(firstDiff?.name || "");
+                    const firstTier = firstDiff?.tiers[0];
+                    setFormTierLabel(firstTier?.label || "");
+                    setFormSaleOverride(firstTier?.price || 0);
                   }}
                 >
-                  {dungeons.map((d) => (
-                    <option key={d.name} value={d.name}>{d.name} (฿{d.price.toLocaleString()})</option>
+                  {dungeonTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
                 </select>
               </label>
+
+              {/* Level 2: Difficulty */}
+              {selectedTemplate && selectedTemplate.difficulties.length > 0 && (
+                <label className="field">
+                  <span>ความยาก</span>
+                  <select
+                    value={formDiffName}
+                    onChange={(e) => {
+                      const diff = selectedTemplate.difficulties.find((d) => d.name === e.target.value);
+                      setFormDiffName(e.target.value);
+                      const firstTier = diff?.tiers[0];
+                      setFormTierLabel(firstTier?.label || "");
+                      setFormSaleOverride(firstTier?.price || 0);
+                    }}
+                  >
+                    {selectedTemplate.difficulties.map((d) => (
+                      <option key={d.name} value={d.name}>{d.name || "ระดับเดียว"}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {/* Level 3: Tier */}
+              {selectedDiff && selectedDiff.tiers.length > 0 && (
+                <label className="field">
+                  <span>ช่วงชั้น (Tier)</span>
+                  <select
+                    value={formTierLabel}
+                    onChange={(e) => {
+                      const tier = selectedDiff.tiers.find((t) => t.label === e.target.value);
+                      setFormTierLabel(e.target.value);
+                      setFormSaleOverride(tier?.price || 0);
+                    }}
+                  >
+                    {selectedDiff.tiers.map((t) => (
+                      <option key={t.label} value={t.label}>ชั้น {t.label} — ฿{t.price.toLocaleString()}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <div className="form-grid">
                 <label className="field">
@@ -1356,12 +2003,13 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                 <label className="field">
                   <span>ยอดขายเต็ม (บาท)</span>
                   <input
+                    key={formSaleOverride}
                     name="sale"
                     required
                     min="1"
                     type="number"
                     placeholder="400"
-                    defaultValue={editRow?.sale ?? dungeons[0]?.price ?? 400}
+                    defaultValue={editRow?.sale ?? formSaleOverride}
                   />
                 </label>
               </div>
@@ -1382,7 +2030,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
 
               <div className="picker-heading" style={{ display: "flex", justifyContent: "space-between", margin: "14px 0 6px" }}>
                 <strong>เลือกทีมแบก</strong>
-                <span style={{ fontSize: "11px", color: selectedPlayers.length === defaultCarryCount ? "#27ae60" : "#e67e22", fontWeight: 700 }}>
+                <span style={{ fontSize: "12px", color: selectedPlayers.length === defaultCarryCount ? "#27ae60" : "#e67e22", fontWeight: 700 }}>
                   เลือกแล้ว {selectedPlayers.length}/{defaultCarryCount} คน
                 </span>
               </div>
@@ -1411,7 +2059,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                         onChange={() => toggleSelectedPlayer(player.id)}
                       />
                       <PlayerAvatar player={player} small />
-                      <span style={{ fontSize: "11px", fontWeight: 600 }}>{player.name}</span>
+                      <span style={{ fontSize: "12px", fontWeight: 600 }}>{player.name}</span>
                     </label>
                   );
                 })}
@@ -1432,11 +2080,11 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                 {currentSlipBase64 && (
                   <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "10px", padding: "8px", background: "#f0f6fc", borderRadius: "6px" }}>
                     <img src={currentSlipBase64} alt="Preview" style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "4px" }} />
-                    <span style={{ fontSize: "11px", color: "#176bca", fontWeight: 600 }}>สลิปพร้อมบันทึก</span>
+                    <span style={{ fontSize: "12px", color: "#176bca", fontWeight: 600 }}>สลิปพร้อมบันทึก</span>
                     <button
                       type="button"
                       onClick={() => setCurrentSlipBase64("")}
-                      style={{ marginLeft: "auto", color: "#d9534f", fontSize: "11px", border: 0, background: "none", cursor: "pointer" }}
+                      style={{ marginLeft: "auto", color: "#d9534f", fontSize: "12px", border: 0, background: "none", cursor: "pointer" }}
                     >
                       ✕ ลบสลิป
                     </button>
@@ -1466,7 +2114,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
         </div>
       )}
 
-      {/* ======================== MODAL: ADD MEMBER (NO EMAIL) ======================== */}
+      {/* ======================== MODAL: ADD MEMBER ======================== */}
       {showMemberForm && role === "admin" && (
         <div className="modal-backdrop" onMouseDown={() => setShowMemberForm(false)}>
           <form
