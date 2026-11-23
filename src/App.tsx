@@ -457,11 +457,11 @@ function AdminAuthModal({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "24px",
+              fontSize: "20px",
               margin: "0 auto 10px auto",
             }}
           >
-            🛡️
+            {icons.lock}
           </div>
           <span className="eyebrow" style={{ color: "#176bca" }}>เฉพาะผู้ดูแลระบบ (Admin Only)</span>
           <h2 style={{ margin: "4px 0 6px 0", fontSize: "20px" }}>
@@ -485,7 +485,7 @@ function AdminAuthModal({
               setSuccessMsg("");
             }}
           >
-            🔐 เข้าสู่ระบบ Admin
+            เข้าสู่ระบบ Admin
           </button>
           <button
             type="button"
@@ -496,7 +496,7 @@ function AdminAuthModal({
               setSuccessMsg("");
             }}
           >
-            ✍️ สมัครบัญชี Admin
+            สมัครบัญชี Admin
           </button>
         </div>
 
@@ -532,7 +532,7 @@ function AdminAuthModal({
 
             {errorMsg && (
               <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>
-                ⚠️ {errorMsg}
+                {errorMsg}
               </p>
             )}
 
@@ -546,7 +546,7 @@ function AdminAuthModal({
             </button>
 
             <p style={{ fontSize: "11px", color: "#94a3b8", textAlign: "center", marginTop: "12px", lineHeight: "1.5" }}>
-              💡 รหัสเริ่มต้นคือ <code>admin</code> หรือ <code>47family</code><br />
+              รหัสเริ่มต้นคือ <code>admin</code> หรือ <code>47family</code><br />
               สมาชิกทั่วไปสามารถปิดหน้านี้เพื่อเข้าเยี่ยมชมได้ทันที
             </p>
           </form>
@@ -592,12 +592,12 @@ function AdminAuthModal({
 
             {errorMsg && (
               <p style={{ color: "#d9534f", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>
-                ⚠️ {errorMsg}
+                {errorMsg}
               </p>
             )}
             {successMsg && (
               <p style={{ color: "#27ae60", fontSize: "12px", marginBottom: "12px", textAlign: "center" }}>
-                ✅ {successMsg}
+                {successMsg}
               </p>
             )}
 
@@ -700,7 +700,7 @@ function PlayerDetailModal({
         {/* Commission recipient */}
         {row.commissionTo && row.commissionTo !== "-" ? (
           <div style={{ background: "#fef9ec", border: "1px solid #f0d080", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "18px" }}>💰</span>
+            <span style={{ display: "inline-flex", color: "#e67e22" }}>{icons.coin}</span>
             <div>
               <small style={{ color: "#888", fontSize: "11px" }}>ผู้รับค่าคอมมิชชั่น</small>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
@@ -712,7 +712,7 @@ function PlayerDetailModal({
           </div>
         ) : (
           <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "16px" }}>💰</span>
+            <span style={{ display: "inline-flex", color: "#64748b" }}>{icons.coin}</span>
             <div>
               <small style={{ color: "#888", fontSize: "11px" }}>ผู้รับค่าคอมมิชชั่น</small>
               <div style={{ fontSize: "13px", color: "#64748b" }}>- (ไม่มีผู้รับค่าคอมมิชชั่น)</div>
@@ -724,7 +724,7 @@ function PlayerDetailModal({
         {row.segments && row.segments.length > 0 && (
           <div style={{ marginBottom: "16px", background: "#f4f8fd", border: "1px solid #c9e0f8", borderRadius: "8px", padding: "12px" }}>
             <strong style={{ fontSize: "13px", display: "block", color: "#176bca", marginBottom: "8px" }}>
-              🔀 การแบ่งช่วงและคนลง (Multi-Tier Breakdown)
+              การแบ่งช่วงและคนลง (Multi-Tier Breakdown)
             </strong>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {row.segments.map((seg, idx) => {
@@ -796,7 +796,7 @@ function PlayerDetailModal({
         {/* Slip preview (contained, non-overflowing) */}
         {row.slip && (
           <div style={{ marginTop: "16px" }}>
-            <strong style={{ fontSize: "13px", display: "block", marginBottom: "8px" }}>🧾 สลิปการโอนเงิน (คลิกเพื่อดูรูปเต็ม)</strong>
+            <strong style={{ fontSize: "13px", display: "block", marginBottom: "8px" }}>สลิปการโอนเงิน (คลิกเพื่อดูรูปเต็ม)</strong>
             <img
               src={row.slip}
               alt="Slip"
@@ -1736,7 +1736,7 @@ function Dashboard({
         </td>
         {showManage && (
           <td>
-            <button className="more-button" onClick={() => openEdit(row)} title="แก้ไข">•••</button>
+            <button className="more-button" onClick={() => openEdit(row)} title="แก้ไข" style={{ fontSize: "16px", lineHeight: 1 }}>⋮</button>
           </td>
         )}
       </tr>
@@ -1797,12 +1797,12 @@ function Dashboard({
         )}
 
         <div className="profile">
-          <div className="profile-avatar">{role === "admin" ? "🛡️" : "👤"}</div>
+          <div className="profile-avatar">{role === "admin" ? (username ? username.slice(0, 2).toUpperCase() : "AD") : "GU"}</div>
           {sidebarOpen && (
             <div className="profile-info">
               <strong>{role === "admin" ? username : "ผู้เยี่ยมชม"}</strong>
               <small style={{ color: role === "admin" ? "#176bca" : "#64748b" }}>
-                {role === "admin" ? "🛡️ ผู้ดูแลระบบ" : "👤 สมาชิก (ดูอย่างเดียว)"}
+                {role === "admin" ? "ผู้ดูแลระบบ" : "สมาชิก (ดูอย่างเดียว)"}
               </small>
             </div>
           )}
@@ -1824,7 +1824,7 @@ function Dashboard({
               }}
               title="เข้าสู่ระบบ Admin"
             >
-              {sidebarOpen ? "🔐 ล็อกอิน Admin" : "🔐"}
+              {sidebarOpen ? "ล็อกอิน Admin" : "Admin"}
             </button>
           )}
         </div>
@@ -1857,7 +1857,7 @@ function Dashboard({
                   cursor: "pointer"
                 }}
               >
-                🔐 เข้าสู่ระบบ Admin
+                เข้าสู่ระบบ Admin
               </button>
             )}
             {(page === "overview" || page === "payments") && role === "admin" && (
@@ -1955,7 +1955,7 @@ function Dashboard({
                     {filteredRows.length === 0 ? (
                       <tr>
                         <td colSpan={role === "admin" ? 10 : 9} style={{ textAlign: "center", padding: "35px", color: "#888" }}>
-                          📋 ยังไม่มีรายการรอบในเงื่อนไขที่เลือก
+                          ยังไม่มีรายการรอบในเงื่อนไขที่เลือก
                         </td>
                       </tr>
                     ) : (
@@ -1990,7 +1990,7 @@ function Dashboard({
                     <tbody>
                       {weeklySummary.map((p, idx) => (
                         <tr key={p.id}>
-                          <td><strong>{idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}</strong></td>
+                          <td><strong>{idx + 1}</strong></td>
                           <td>
                             <div className="name-cell">
                               <PlayerAvatar player={p} small />
@@ -2075,7 +2075,7 @@ function Dashboard({
                   {filteredRows.length === 0 ? (
                     <tr>
                       <td colSpan={role === "admin" ? 10 : 9} style={{ textAlign: "center", padding: "35px", color: "#888" }}>
-                        📋 ไม่พบข้อมูลในเงื่อนไขที่เลือก
+                        ไม่พบข้อมูลในเงื่อนไขที่เลือก
                       </td>
                     </tr>
                   ) : (
@@ -2158,11 +2158,13 @@ function Dashboard({
                                   alignItems: "center",
                                   justifyContent: "center",
                                   cursor: "pointer",
-                                  fontSize: "13px"
+                                  fontSize: "17px",
+                                  fontWeight: "bold",
+                                  lineHeight: 1
                                 }}
                                 title={`แก้ไขชื่อ ${player.name}`}
                               >
-                                ✏️
+                                ⋮
                               </button>
                               <button
                                 type="button"
@@ -2323,7 +2325,7 @@ function Dashboard({
                   <tbody>
                     {weeklySummary.map((p, idx) => (
                       <tr key={p.id}>
-                        <td><strong>{idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}</strong></td>
+                        <td><strong>{idx + 1}</strong></td>
                         <td>
                           <div className="name-cell">
                             <PlayerAvatar player={p} small />
@@ -2406,7 +2408,7 @@ function Dashboard({
               {/* Card 1: Dungeon Template Management */}
               <div className="settings-card full">
                 <div className="settings-title">
-                  <div className="settings-icon">🏰</div>
+                  <div className="settings-icon">{icons.grid}</div>
                   <div>
                     <h2>จัดการดันเจี้ยน ความยาก และราคา</h2>
                     <p>สร้างดันเจี้ยน เพิ่มความยาก (NM/Hell/Infinite) และกำหนดราคาแต่ละ Tier</p>
@@ -2448,14 +2450,14 @@ function Dashboard({
                           </div>
                         ) : (
                           <>
-                            <span className="dungeon-group-name">🏰 {tmpl.name}</span>
+                            <span className="dungeon-group-name">{tmpl.name}</span>
                             <span className="dungeon-group-badge">{tmpl.difficulties.length} ความยาก</span>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setEditingDungeonId(tmpl.id); setEditDungeonNameVal(tmpl.name); }}
-                              style={{ border: 0, background: "none", color: "#176bca", cursor: "pointer", marginLeft: "4px" }}
+                              style={{ border: 0, background: "none", color: "#176bca", cursor: "pointer", marginLeft: "4px", fontSize: "16px", lineHeight: 1 }}
                               title="แก้ไขชื่อดันเจี้ยน"
-                            >✏️</button>
+                            >⋮</button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDeleteDungeonTemplate(tmpl.id); }}
@@ -2526,9 +2528,9 @@ function Dashboard({
                                   <button
                                     type="button"
                                     onClick={() => { setEditingDiffKey(`${tmpl.id}_${diff.name}`); setEditDiffNameVal(diff.name); setEditDiffTiers([...diff.tiers]); }}
-                                    style={{ border: 0, background: "none", color: "#176bca", cursor: "pointer" }}
+                                    style={{ border: 0, background: "none", color: "#176bca", cursor: "pointer", fontSize: "16px", lineHeight: 1 }}
                                     title="แก้ไขความยากนี้"
-                                  >✏️</button>
+                                  >⋮</button>
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteDifficulty(tmpl.id, diff.name)}
@@ -2612,7 +2614,7 @@ function Dashboard({
               {/* Card 2: General System Settings */}
               <div className="settings-card">
                 <div className="settings-title">
-                  <div className="settings-icon">⚙️</div>
+                  <div className="settings-icon">{icons.settings}</div>
                   <div>
                     <h2>ตั้งค่าระบบทั่วไป</h2>
                     <p>กำหนดจำนวนคนแบกและอัตราค่าคอมมิชชั่น</p>
@@ -2669,7 +2671,7 @@ function Dashboard({
               {/* Card 3: Permissions Information */}
               <div className="settings-card">
                 <div className="settings-title">
-                  <div className="settings-icon">🛡️</div>
+                  <div className="settings-icon">{icons.lock}</div>
                   <div>
                     <h2>ระดับสิทธิ์ในระบบ</h2>
                     <p>สิทธิ์การเข้าถึงสำหรับผู้ดูแลและสมาชิก</p>
@@ -2678,11 +2680,11 @@ function Dashboard({
 
                 <div className="permission-grid">
                   <div>
-                    <strong>🛡️ ผู้ดูแลระบบ (Admin)</strong>
+                    <strong>ผู้ดูแลระบบ (Admin)</strong>
                     <span>เพิ่ม/แก้ไข/ลบรอบดันเจี้ยน, จัดการสมาชิก, ตั้งค่าระบบ และส่งออกข้อมูล</span>
                   </div>
                   <div>
-                    <strong>👀 สมาชิก (Member)</strong>
+                    <strong>สมาชิก (Member)</strong>
                     <span>เข้าตรวจสอบตาราง ยอดเงิน รายได้สะสม สลิปการโอน และดูประวัติได้อย่างโปร่งใส (ดูอย่างเดียว)</span>
                   </div>
                 </div>
@@ -2705,7 +2707,7 @@ function Dashboard({
               {role === "admin" && (
                 <div className="settings-card">
                   <div className="settings-title">
-                    <div className="settings-icon">👥</div>
+                    <div className="settings-icon">{icons.users}</div>
                     <div>
                       <h2>จัดการบัญชีผู้ใช้งานระบบ (User Accounts)</h2>
                       <p>รายชื่อผู้ใช้งานทั้งหมดที่สมัครเข้ามาในระบบ สามารถเปลี่ยนยศ หรือลบบัญชีผู้ใช้ได้</p>
@@ -2762,7 +2764,7 @@ function Dashboard({
                                   padding: "2px 8px",
                                   borderRadius: "4px"
                                 }}>
-                                  {u.role === "admin" ? "🛡️ ผู้ดูแล (Admin)" : "👤 สมาชิก (Member)"}
+                                  {u.role === "admin" ? "ผู้ดูแล (Admin)" : "สมาชิก (Member)"}
                                 </span>
                               </div>
                             </div>
@@ -3041,7 +3043,6 @@ function Dashboard({
                         alignItems: "center",
                         gap: "8px"
                       }}>
-                        {discountPct > 0 ? "🏷️" : "📈"}
                         <span>
                           {discountPct > 0
                             ? <>ส่วนลด <strong style={{ color: "#e53e3e" }}>{discountPct}%</strong> (ลด ฿{Math.abs(diff).toLocaleString()} จากฐาน ฿{baseSum.toLocaleString()})</>
@@ -3082,14 +3083,14 @@ function Dashboard({
                       className={`carry-mode-tab${!isSplitCarry ? " active" : ""}`}
                       onClick={() => { setIsSplitCarry(false); setTierPlayerMap({}); }}
                     >
-                      🤝 แบกพร้อมกัน
+                      แบกพร้อมกัน
                     </button>
                     <button
                       type="button"
                       className={`carry-mode-tab${isSplitCarry ? " active" : ""}`}
                       onClick={() => { setIsSplitCarry(true); setSelectedPlayers([]); }}
                     >
-                      🔀 แบ่งทีมแต่ละชั้น
+                      แบ่งทีมแต่ละชั้น
                     </button>
                   </div>
 
@@ -3104,8 +3105,8 @@ function Dashboard({
                         border: isSplitCarry ? "1px solid #fde68a" : "1px solid #bbf7d0"
                       }}>
                         {isSplitCarry
-                          ? `🔀 โหมดแบ่งทีม — เลือกคนแบกแต่ละชั้นด้านล่าง (${expandedCount} ชั้น)`
-                          : `🤝 โหมดแบกรวม — เลือกทีมแบกทุกชั้นพร้อมกัน`}
+                          ? `โหมดแบ่งทีม — เลือกคนแบกแต่ละชั้นด้านล่าง (${expandedCount} ชั้น)`
+                          : `โหมดแบกรวม — เลือกทีมแบกทุกชั้นพร้อมกัน`}
                       </div>
                     );
                   })()}
@@ -3160,7 +3161,7 @@ function Dashboard({
                           <div className="live-wage-preview">
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
                               <strong style={{ margin: 0, fontSize: "13px" }}>
-                                💡 ประมาณการรายได้จริง
+                                ประมาณการรายได้จริง
                                 {discountPct > 0 ? (
                                   <span style={{ color: "#dc2626", marginLeft: "6px", fontSize: "11px", fontWeight: 700 }}>
                                     (ลด {discountPct}% · ยอดจริง ฿{effectiveSale.toLocaleString()})
@@ -3190,7 +3191,7 @@ function Dashboard({
                                 border: "1px solid #bbf7d0"
                               }}>
                                 <div style={{ fontSize: "11px", fontWeight: 700, color: "#166534", marginBottom: "6px" }}>
-                                  📋 รายได้ต่อคน แยกตามแต่ละชั้น:
+                                  รายได้ต่อคน แยกตามแต่ละชั้น:
                                 </div>
                                 <div style={{
                                   display: "grid",
@@ -3289,7 +3290,7 @@ function Dashboard({
                                 <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
                                   {assigned.length > 0
                                     ? `${assigned.length} คน → คนละ ฿${formatMoney(tierWage)}`
-                                    : "⚠️ ยังไม่เลือกคน"}
+                                    : "ยังไม่เลือกคน"}
                                 </small>
                               </div>
                               <div className="tier-player-chips">
@@ -3323,7 +3324,7 @@ function Dashboard({
                 <label className="upload-box" style={{ cursor: "pointer", display: "block" }}>
                   <input type="file" accept="image/*" onChange={handleSlipFile} style={{ display: "none" }} />
                   <div style={{ textAlign: "center", padding: "14px" }}>
-                    <span className="upload-icon" style={{ fontSize: "20px" }}>📷</span>
+                    <span className="upload-icon" style={{ display: "inline-flex", color: "#176bca" }}>{icons.image}</span>
                     <strong style={{ display: "block", marginTop: "4px" }}>
                       {currentSlipBase64 ? "มีรูปสลิปแล้ว (คลิกเพื่อเปลี่ยนรูป)" : "แนบสลิปการโอนเงิน (คลิกเลือกรูปภาพ)"}
                     </strong>
@@ -3442,7 +3443,7 @@ function Dashboard({
             onMouseDown={(e) => e.stopPropagation()}
           >
             <button type="button" className="modal-close" onClick={() => setViewSlipUrl(null)}>×</button>
-            <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px" }}>🧾 สลิปการโอนเงิน</h3>
+            <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px" }}>สลิปการโอนเงิน</h3>
             <div style={{ maxHeight: "70vh", overflowY: "auto", borderRadius: "6px", border: "1px solid #ddd" }}>
               <img src={viewSlipUrl} alt="Slip" style={{ width: "100%", display: "block" }} />
             </div>
