@@ -728,6 +728,8 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedDungeonFilter, setSelectedDungeonFilter] = useState("ทั้งหมด");
   const [dateFilter, setDateFilter] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [selectedRow, setSelectedRow] = useState<PaymentRow | null>(null);
   const [editRow, setEditRow] = useState<PaymentRow | null>(null);
@@ -875,14 +877,51 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     };
   }, []);
 
+  // Helper: parse "DD-MMM" or "DD/MM/YY" date strings into a comparable Date
+  const parseRowDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    // Try "DD-MMM" e.g. "23-Nov"
+    const m1 = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})(?:-(\d{2,4}))?/);
+    if (m1) {
+      const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+      const mon = months[m1[2]];
+      if (mon !== undefined) {
+        const yr = m1[3] ? (m1[3].length === 2 ? 2000 + Number(m1[3]) : Number(m1[3])) : new Date().getFullYear();
+        return new Date(yr, mon, Number(m1[1]));
+      }
+    }
+    // Try "DD/MM/YY" or "DD/MM/YYYY"
+    const m2 = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m2) {
+      const yr = m2[3].length === 2 ? 2000 + Number(m2[3]) : Number(m2[3]);
+      return new Date(yr, Number(m2[2]) - 1, Number(m2[1]));
+    }
+    return null;
+  };
+
   // Filtered rows
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       const matchDungeon = selectedDungeonFilter === "ทั้งหมด" || row.dungeon === selectedDungeonFilter;
       const matchDate = !dateFilter || row.date.toLowerCase().includes(dateFilter.toLowerCase());
-      return matchDungeon && matchDate;
+      // Date range filter
+      let matchFrom = true;
+      let matchTo = true;
+      if (filterDateFrom || filterDateTo) {
+        const rowDate = parseRowDate(row.date);
+        if (filterDateFrom) {
+          const from = new Date(filterDateFrom);
+          if (!rowDate || rowDate < from) matchFrom = false;
+        }
+        if (filterDateTo) {
+          const to = new Date(filterDateTo);
+          to.setHours(23, 59, 59);
+          if (!rowDate || rowDate > to) matchTo = false;
+        }
+      }
+      return matchDungeon && matchDate && matchFrom && matchTo;
     });
-  }, [rows, selectedDungeonFilter, dateFilter]);
+  }, [rows, selectedDungeonFilter, dateFilter, filterDateFrom, filterDateTo]);
 
   const total = filteredRows.reduce((sum, row) => sum + row.sale, 0);
   const commission = total * (commissionRate / 100);
@@ -982,14 +1021,9 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     const firstDiff = firstTemplate?.difficulties[0];
     setFormDungeonId(firstTemplate?.id || "");
     setFormDiffName(firstDiff?.name || "");
-    if (firstDiff && firstDiff.tiers.length > 0) {
-      setSelectedTiers([...firstDiff.tiers]);
-      const sum = firstDiff.tiers.reduce((s, t) => s + (Number(t.price) || 0), 0);
-      setFormSaleOverride(sum);
-    } else {
-      setSelectedTiers([]);
-      setFormSaleOverride(0);
-    }
+    // Start with no tiers selected — user picks manually
+    setSelectedTiers([]);
+    setFormSaleOverride(0);
     setShowAdd(true);
   };
 
@@ -1263,6 +1297,32 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     notify(`ลบความยาก "${diffName}" แล้ว`);
   };
 
+  const handleSaveDiffEdit = async (templateId: string) => {
+    const updated = dungeonTemplates.map((tmpl) => {
+      if (tmpl.id !== templateId) return tmpl;
+      return {
+        ...tmpl,
+        difficulties: tmpl.difficulties.map((diff) => {
+          if (`${templateId}_${diff.name}` !== editingDiffKey) return diff;
+          return { name: editDiffNameVal.trim() || diff.name, tiers: editDiffTiers.filter((t) => t.label && t.price > 0) };
+        }),
+      };
+    });
+    await saveDungeonTemplates(updated);
+    setEditingDiffKey(null);
+    notify("บันทึกการแก้ไขความยากเรียบร้อย");
+  };
+
+  const handleSaveDungeonName = async (tmplId: string) => {
+    const updated = dungeonTemplates.map((tmpl) => {
+      if (tmpl.id !== tmplId) return tmpl;
+      return { ...tmpl, name: editDungeonNameVal.trim() || tmpl.name };
+    });
+    await saveDungeonTemplates(updated);
+    setEditingDungeonId(null);
+    notify("บันทึกชื่อดันเจี้ยนเรียบร้อย");
+  };
+
   const handleSaveGeneralSettings = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -1466,6 +1526,24 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                       {allDungeonNames.map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </label>
+                  <input
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                    title="วันที่เริ่มต้น"
+                    style={{ height: "35px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 8px", fontSize: "12px" }}
+                  />
+                  <span style={{ color: "#aaa", fontSize: "12px" }}>–</span>
+                  <input
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                    title="วันที่สิ้นสุด"
+                    style={{ height: "35px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 8px", fontSize: "12px" }}
+                  />
+                  {(filterDateFrom || filterDateTo) && (
+                    <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} style={{ border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 8px", height: "35px", fontSize: "11px", background: "#f8fafc", cursor: "pointer", color: "#64748b" }}>✕ ล้างวันที่</button>
+                  )}
                 </div>
               </div>
               <div className="table-wrap">
@@ -1561,13 +1639,6 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                 <p>บันทึกการลงดันเจี้ยน ส่วนแบ่ง และสลิปโอนเงิน</p>
               </div>
               <div className="filters">
-                <input
-                  type="text"
-                  placeholder="ค้นหาวันที่ (เช่น 23-Nov)..."
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  style={{ height: "35px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 10px", fontSize: "12px" }}
-                />
                 <label>
                   {icons.filter}
                   <select value={selectedDungeonFilter} onChange={(e) => setSelectedDungeonFilter(e.target.value)}>
@@ -1575,6 +1646,24 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     {allDungeonNames.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
+                <input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                  title="วันที่เริ่มต้น"
+                  style={{ height: "35px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 8px", fontSize: "12px" }}
+                />
+                <span style={{ color: "#aaa", fontSize: "12px" }}>–</span>
+                <input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={(e) => setFilterDateTo(e.target.value)}
+                  title="วันที่สิ้นสุด"
+                  style={{ height: "35px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 8px", fontSize: "12px" }}
+                />
+                {(filterDateFrom || filterDateTo) && (
+                  <button type="button" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }} style={{ border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 8px", height: "35px", fontSize: "11px", background: "#f8fafc", cursor: "pointer", color: "#64748b" }}>✕ ล้างวันที่</button>
+                )}
               </div>
             </div>
             <div className="table-wrap">
@@ -1689,6 +1778,8 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                         onClick={() => {
                           setSelectedDungeonFilter("ทั้งหมด");
                           setDateFilter("");
+                          setFilterDateFrom("");
+                          setFilterDateTo("");
                           setPage("payments");
                           notify(`กำลังแสดงรายการทั้งหมด`);
                         }}
@@ -1914,17 +2005,39 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                 <div className="dungeon-tree">
                   {dungeonTemplates.map((tmpl) => (
                     <div key={tmpl.id} className="dungeon-group">
-                      {/* Header */}
-                      <div className="dungeon-group-header" onClick={() => setEditingTemplateId(editingTemplateId === tmpl.id ? null : tmpl.id)}>
-                        <span className="dungeon-group-name">🏰 {tmpl.name}</span>
-                        <span className="dungeon-group-badge">{tmpl.difficulties.length} ความยาก</span>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteDungeonTemplate(tmpl.id); }}
-                          style={{ border: 0, background: "none", color: "#d9534f", cursor: "pointer", marginLeft: "8px" }}
-                        >
-                          {icons.trash}
-                        </button>
+                      {/* Header — editable dungeon name */}
+                      <div className="dungeon-group-header" onClick={() => { if (editingDungeonId !== tmpl.id) setEditingTemplateId(editingTemplateId === tmpl.id ? null : tmpl.id); }}>
+                        {editingDungeonId === tmpl.id ? (
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center", flex: 1 }} onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={editDungeonNameVal}
+                              onChange={(e) => setEditDungeonNameVal(e.target.value)}
+                              style={{ flex: 1, height: "32px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 10px", fontSize: "13px" }}
+                              autoFocus
+                            />
+                            <button type="button" className="primary-button" style={{ height: "32px", padding: "0 12px" }} onClick={() => handleSaveDungeonName(tmpl.id)}>บันทึก</button>
+                            <button type="button" style={{ height: "32px", padding: "0 10px", border: "1px solid #ddd", borderRadius: "5px", background: "#fff", cursor: "pointer" }} onClick={() => setEditingDungeonId(null)}>ยกเลิก</button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="dungeon-group-name">🏰 {tmpl.name}</span>
+                            <span className="dungeon-group-badge">{tmpl.difficulties.length} ความยาก</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditingDungeonId(tmpl.id); setEditDungeonNameVal(tmpl.name); }}
+                              style={{ border: 0, background: "none", color: "#176bca", cursor: "pointer", marginLeft: "4px" }}
+                              title="แก้ไขชื่อดันเจี้ยน"
+                            >✏️</button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteDungeonTemplate(tmpl.id); }}
+                              style={{ border: 0, background: "none", color: "#d9534f", cursor: "pointer", marginLeft: "4px" }}
+                            >
+                              {icons.trash}
+                            </button>
+                          </>
+                        )}
                       </div>
 
                       {/* Difficulties list */}
@@ -1932,21 +2045,69 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                         <div className="dungeon-difficulty-list">
                           {tmpl.difficulties.map((diff) => (
                             <div key={diff.name} className="dungeon-difficulty-row">
-                              <span className="diff-name">{diff.name || "ระดับเดียว"}</span>
-                              <div className="diff-tiers">
-                                {diff.tiers.map((tier) => (
-                                  <span key={tier.label} className="diff-tier-chip">
-                                    ชั้น {tier.label} · <strong>฿{tier.price.toLocaleString()}</strong>
-                                  </span>
-                                ))}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteDifficulty(tmpl.id, diff.name)}
-                                style={{ border: 0, background: "none", color: "#bbb", cursor: "pointer" }}
-                              >
-                                {icons.trash}
-                              </button>
+                              {editingDiffKey === `${tmpl.id}_${diff.name}` ? (
+                                /* ---- EDIT MODE ---- */
+                                <div style={{ flex: 1, padding: "10px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #dce4ec" }}>
+                                  <label style={{ display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: 600 }}>
+                                    ชื่อความยาก
+                                    <input
+                                      type="text"
+                                      value={editDiffNameVal}
+                                      onChange={(e) => setEditDiffNameVal(e.target.value)}
+                                      style={{ display: "block", width: "100%", marginTop: "4px", height: "34px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 10px", fontSize: "13px", boxSizing: "border-box" }}
+                                    />
+                                  </label>
+                                  <strong style={{ fontSize: "12px", display: "block", margin: "10px 0 6px" }}>Tiers และราคา</strong>
+                                  {editDiffTiers.map((tier, idx) => (
+                                    <div key={idx} className="tier-row">
+                                      <input
+                                        type="text"
+                                        placeholder="ชั้น (เช่น 1-3, 4-5, 1-5)"
+                                        value={tier.label}
+                                        onChange={(e) => { const t = [...editDiffTiers]; t[idx] = { ...t[idx], label: e.target.value }; setEditDiffTiers(t); }}
+                                      />
+                                      <input
+                                        type="number"
+                                        placeholder="ราคา (฿)"
+                                        min={0}
+                                        value={tier.price || ""}
+                                        onChange={(e) => { const t = [...editDiffTiers]; t[idx] = { ...t[idx], price: Number(e.target.value) }; setEditDiffTiers(t); }}
+                                      />
+                                      <button type="button" onClick={() => setEditDiffTiers(editDiffTiers.filter((_, i) => i !== idx))} style={{ border: 0, background: "none", color: "#bbb", cursor: "pointer" }}>✕</button>
+                                    </div>
+                                  ))}
+                                  <button type="button" className="outline-button" style={{ marginTop: "6px", fontSize: "12px" }} onClick={() => setEditDiffTiers([...editDiffTiers, { label: "", price: 0 }])}>+ เพิ่ม Tier</button>
+                                  <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                                    <button type="button" className="primary-button" onClick={() => handleSaveDiffEdit(tmpl.id)}>บันทึก</button>
+                                    <button type="button" style={{ border: "1px solid #ddd", borderRadius: "4px", padding: "0 14px", height: "36px", background: "#fff", cursor: "pointer" }} onClick={() => setEditingDiffKey(null)}>ยกเลิก</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* ---- VIEW MODE ---- */
+                                <>
+                                  <span className="diff-name">{diff.name || "ระดับเดียว"}</span>
+                                  <div className="diff-tiers">
+                                    {diff.tiers.map((tier) => (
+                                      <span key={tier.label} className="diff-tier-chip">
+                                        ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · <strong>฿{tier.price.toLocaleString()}</strong>
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setEditingDiffKey(`${tmpl.id}_${diff.name}`); setEditDiffNameVal(diff.name); setEditDiffTiers([...diff.tiers]); }}
+                                    style={{ border: 0, background: "none", color: "#176bca", cursor: "pointer" }}
+                                    title="แก้ไขความยากนี้"
+                                  >✏️</button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteDifficulty(tmpl.id, diff.name)}
+                                    style={{ border: 0, background: "none", color: "#bbb", cursor: "pointer" }}
+                                  >
+                                    {icons.trash}
+                                  </button>
+                                </>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2255,7 +2416,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                             setTierPlayerMap(newMap);
                           }}
                         >
-                          <span className="tier-chip-label">ชั้น {tier.label}</span>
+                          <span className="tier-chip-label">ชั้น {tier.label.replace(/^ชั้น\s*/i, "")}</span>
                           <span className="tier-chip-price">฿{tier.price.toLocaleString()}/คน</span>
                         </button>
                       );
@@ -2478,7 +2639,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                           return (
                             <div key={tier.label} className="tier-assign-card">
                               <div className="tier-assign-head">
-                                <strong>ชั้น {tier.label} · ฿{tier.price.toLocaleString()}/คน (ฐาน)</strong>
+                                <strong>ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · ฿{tier.price.toLocaleString()}/คน (ฐาน)</strong>
                                 <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
                                   {assigned.length > 0
                                     ? `${assigned.length} คน → คนละ ฿${tierWage?.toLocaleString()}`
