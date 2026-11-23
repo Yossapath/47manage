@@ -52,7 +52,7 @@
 .app-shell.sidebar-collapsed .dashboard { margin-left: 62px; }
 
 /* ======================== SIDEBAR ======================== */
-.sidebar { position: fixed; inset: 0 auto 0 0; width: 224px; z-index: 10; padding: 20px 14px 18px; display: flex; flex-direction: column; border-right: 1px solid #deded7; background: #fafaf7; transition: width 0.22s ease; overflow-x: hidden; overflow-y: auto; }
+.sidebar { position: fixed; inset: 0 auto 0 0; width: 248px; z-index: 10; padding: 20px 14px 18px; display: flex; flex-direction: column; border-right: 1px solid #deded7; background: #fafaf7; transition: width 0.22s ease; overflow-x: hidden; overflow-y: auto; }
 .side-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 24px; min-height: 60px; white-space: nowrap; }
 .brand-mark.mini { width: 37px; height: 37px; border-radius: 11px 5px 11px 5px; flex-shrink: 0; }
 .brand-mark.mini span { font-size: 12px; }
@@ -67,22 +67,24 @@
 .nav-item:hover { background: #f1f1ec; }
 .nav-item.active { color: #185fae; background: #e8f2ff; font-weight: 700; }
 .nav-item.active svg { color: #2373c8; }
+.nav-item.nav-logout:hover { background: #fef2f2; color: #dc2626; }
 .commission-rule { margin-top: auto; padding: 14px; border: 1px solid #d8e7f7; border-radius: 6px; background: #edf6ff; white-space: nowrap; }
 .commission-rule span { color: #85877c; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .commission-rule strong { display: block; margin: 5px 0; color: #1863b4; font-size: 12px; }
 .commission-rule p { color: #8b8d83; font-size: 10px; line-height: 1.5; }
-.profile { display: flex; align-items: center; gap: 8px; margin-top: 15px; padding: 14px 5px 0; border-top: 1px solid #e4e4de; white-space: nowrap; min-width: 0; }
-.profile-avatar { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #2474ca; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-.profile strong { display: block; font-size: 12px; }
-.profile small { display: block; color: #92938c; font-size: 10px; }
-.profile button { border: 0; padding: 6px; color: #999a93; background: none; flex-shrink: 0; margin-left: auto; border-radius: 6px; cursor: pointer; }
-.profile button:hover { background: #f1f1ec; color: #d9534f; }
+.profile { display: flex; align-items: center; gap: 10px; margin-top: 15px; padding: 14px 6px 0; border-top: 1px solid #e4e4de; width: 100%; min-width: 0; }
+.profile-avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #2474ca; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.profile-info { flex: 1 1 0; min-width: 0; overflow: hidden; }
+.profile-info strong { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-info small { display: block; color: #92938c; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-logout-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #fecaca; border-radius: 6px; color: #dc2626; background: #fef2f2; flex-shrink: 0; margin-left: auto; cursor: pointer; transition: all 0.15s ease; }
+.profile-logout-btn:hover { background: #fee2e2; border-color: #f87171; color: #b91c1c; }
 /* Collapsed sidebar: centre avatar + logout button stacked */
-.app-shell.sidebar-collapsed .profile { flex-direction: column; gap: 6px; align-items: center; }
-.app-shell.sidebar-collapsed .profile button { margin-left: 0; }
+.app-shell.sidebar-collapsed .profile { flex-direction: column; gap: 8px; align-items: center; padding: 10px 0 0; }
+.app-shell.sidebar-collapsed .profile-logout-btn { margin-left: 0; }
 
 /* ======================== MAIN DASHBOARD ======================== */
-.dashboard { margin-left: 224px; padding: 28px 32px 60px; transition: margin-left 0.22s ease; }
+.dashboard { margin-left: 248px; padding: 28px 32px 60px; transition: margin-left 0.22s ease; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
 .topbar p { margin-bottom: 4px; color: #9a9a93; font-size: 11px; }
 .topbar h1 { font-size: 24px; letter-spacing: -.03em; font-weight: 650; }

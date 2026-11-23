@@ -1236,7 +1236,10 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   // Shared table row renderer
   const renderTableRow = (row: PaymentRow, showManage: boolean) => {
     const carryCount = row.players.length || defaultCarryCount;
-    const perPlayer = (row.sale * (1 - commissionRate / 100)) / carryCount;
+    // Use proportional discount-aware wage (uses actual sale, not base tier price)
+    const perPlayer = row.players.length > 0
+      ? row.players.reduce((sum, pid) => sum + getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount), 0) / row.players.length
+      : (row.sale * (1 - commissionRate / 100)) / carryCount;
     const diffLabel = [row.difficulty, row.tier].filter(Boolean).join(" · ");
     return (
       <tr key={row.id}>
@@ -1330,14 +1333,16 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
         <div className="profile">
           <div className="profile-avatar">{username.slice(0, 2).toUpperCase()}</div>
           {sidebarOpen && (
-            <div>
+            <div className="profile-info">
               <strong>{username}</strong>
               <small style={{ color: role === "admin" ? "#176bca" : "#666" }}>
                 {role === "admin" ? "🛡️ ผู้ดูแลระบบ" : "👀 สมาชิก"}
               </small>
             </div>
           )}
-          <button onClick={onLogout} title="ออกจากระบบ">{icons.logout}</button>
+          <button className="profile-logout-btn" onClick={onLogout} title="ออกจากระบบ">
+            {icons.logout}
+          </button>
         </div>
       </aside>
 
@@ -1594,8 +1599,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                 .map((player) => {
                   const playerRuns = rows.filter((r) => r.players.includes(player.id));
                   const income = playerRuns.reduce((sum, r) => {
-                    const count = r.players.length || defaultCarryCount;
-                    return sum + (r.sale * (1 - commissionRate / 100)) / count;
+                    return sum + getPlayerWageForRun(r, player.id, commissionRate, defaultCarryCount);
                   }, 0);
                   const comIncome = rows
                     .filter((r) => r.commissionTo === player.name)
@@ -1687,7 +1691,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                 <div className="bar-chart">
                   {memberList.slice(0, 7).map((p) => {
                     const pRuns = rows.filter((r) => r.players.includes(p.id));
-                    const inc = pRuns.reduce((sum, r) => sum + (r.sale * (1 - commissionRate / 100)) / (r.players.length || 4), 0);
+                    const inc = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount), 0);
                     const barH = total > 0 ? Math.max(20, Math.min(160, (inc / (total / 3)) * 140)) : 20;
                     return (
                       <div key={p.id}>
@@ -1743,7 +1747,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                     {memberList
                       .map((p) => {
                         const pRuns = rows.filter((r) => r.players.includes(p.id));
-                        const wage = pRuns.reduce((sum, r) => sum + (r.sale * (1 - commissionRate / 100)) / (r.players.length || 4), 0);
+                        const wage = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount), 0);
                         const com = rows.filter((r) => r.commissionTo === p.name).reduce((sum, r) => sum + (r.sale * commissionRate) / 100, 0);
                         return { ...p, rounds: pRuns.length, wage, com, grand: wage + com };
                       })
