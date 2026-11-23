@@ -661,7 +661,9 @@ function PlayerDetailModal({
   const totalWagePool = totalSale - totalCom;
 
   const comPlayer = memberList.find((p) => isPlayerMatch(p, row.commissionTo));
-  const diffLabel = [row.difficulty, row.tier].filter(Boolean).join(" · ");
+  const isMayaRow = Boolean(row.dungeon?.toLowerCase().includes("maya"));
+  const cleanTier = isMayaRow ? row.tier.replace(/ชั้น\s*/gi, "") : row.tier;
+  const diffLabel = [row.difficulty, cleanTier].filter(Boolean).join(" · ");
 
   const baseSum = (row.segments && row.segments.length > 0)
     ? row.segments.reduce((sum, s) => sum + (Number(s.price) || 0), 0)
@@ -696,23 +698,33 @@ function PlayerDetailModal({
         </div>
 
         {/* Commission recipient */}
-        <div style={{ background: "#fef9ec", border: "1px solid #f0d080", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "18px" }}>💰</span>
-          <div>
-            <small style={{ color: "#888", fontSize: "11px" }}>ผู้รับค่าคอมมิชชั่น</small>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
-              {comPlayer && <PlayerAvatar player={comPlayer} small />}
-              <strong style={{ fontSize: "13px" }}>{row.commissionTo}</strong>
-              <span style={{ color: "#e67e22", fontWeight: 700, fontSize: "13px" }}>฿{formatMoney(totalCom)}</span>
+        {row.commissionTo && row.commissionTo !== "-" ? (
+          <div style={{ background: "#fef9ec", border: "1px solid #f0d080", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "18px" }}>💰</span>
+            <div>
+              <small style={{ color: "#888", fontSize: "11px" }}>ผู้รับค่าคอมมิชชั่น</small>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                {comPlayer && <PlayerAvatar player={comPlayer} small />}
+                <strong style={{ fontSize: "13px" }}>{row.commissionTo}</strong>
+                <span style={{ color: "#e67e22", fontWeight: 700, fontSize: "13px" }}>฿{formatMoney(totalCom)}</span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "16px" }}>💰</span>
+            <div>
+              <small style={{ color: "#888", fontSize: "11px" }}>ผู้รับค่าคอมมิชชั่น</small>
+              <div style={{ fontSize: "13px", color: "#64748b" }}>- (ไม่มีผู้รับค่าคอมมิชชั่น)</div>
+            </div>
+          </div>
+        )}
 
         {/* Multi-Tier breakdown if exists */}
         {row.segments && row.segments.length > 0 && (
           <div style={{ marginBottom: "16px", background: "#f4f8fd", border: "1px solid #c9e0f8", borderRadius: "8px", padding: "12px" }}>
             <strong style={{ fontSize: "13px", display: "block", color: "#176bca", marginBottom: "8px" }}>
-              🔀 การแบ่งช่วงชั้นและคนลง (Multi-Tier Breakdown)
+              🔀 การแบ่งช่วงและคนลง (Multi-Tier Breakdown)
             </strong>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {row.segments.map((seg, idx) => {
@@ -723,7 +735,7 @@ function PlayerDetailModal({
                   <div key={idx} style={{ background: "#fff", border: "1px solid #e1eaf3", borderRadius: "6px", padding: "8px 12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <strong style={{ fontSize: "13px", color: "#2c3e50" }}>
-                        ชั้น {seg.tierLabel} (ฐาน ฿{seg.price.toLocaleString()}{scale !== 1 ? ` → ยอดคิดจริง ฿${formatMoney(effectivePrice)}` : ""})
+                        {isMayaRow ? "" : "ชั้น "}{seg.tierLabel.replace(/^ชั้น\s*/i, "")} (ฐาน ฿{seg.price.toLocaleString()}{scale !== 1 ? ` → ยอดคิดจริง ฿${formatMoney(effectivePrice)}` : ""})
                       </strong>
                       <span style={{ fontSize: "12px", color: "#27ae60", fontWeight: 700 }}>
                         แบ่งคนละ ฿{formatMoney(segPerPerson)}
@@ -845,6 +857,7 @@ function Dashboard({
   const [isSplitCarry, setIsSplitCarry] = useState<boolean>(false);
   const [tierPlayerMap, setTierPlayerMap] = useState<Record<string, string[]>>({});
   const [formSaleOverride, setFormSaleOverride] = useState<number>(0);
+  const [formCommissionTo, setFormCommissionTo] = useState<string>("-");
 
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
@@ -1146,6 +1159,10 @@ function Dashboard({
     selectedTemplate?.difficulties.find((d) => d.name === formDiffName) || selectedTemplate?.difficulties[0],
     [selectedTemplate, formDiffName]
   );
+  const isMaya = useMemo(() =>
+    Boolean(selectedTemplate && (selectedTemplate.id.toLowerCase().includes("maya") || selectedTemplate.name.toLowerCase().includes("maya"))),
+    [selectedTemplate]
+  );
 
   // Aggregated list: memberList + any player / commission recipient mentioned in rows
   const allActivePlayers = useMemo(() => {
@@ -1191,7 +1208,7 @@ function Dashboard({
         const pRuns = rows.filter((r) => r.players.includes(p.id) || r.players.some((x) => isPlayerMatch(p, x)));
         const wage = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount), 0);
         const com = rows
-          .filter((r) => isPlayerMatch(p, r.commissionTo))
+          .filter((r) => r.commissionTo && r.commissionTo !== "-" && isPlayerMatch(p, r.commissionTo))
           .reduce((sum, r) => sum + (r.sale * commissionRate) / 100, 0);
 
         return { ...p, rounds: pRuns.length, wage, com, grand: wage + com };
@@ -1224,6 +1241,7 @@ function Dashboard({
     const firstDiff = firstTemplate?.difficulties[0];
     setFormDungeonId(firstTemplate?.id || "");
     setFormDiffName(firstDiff?.name || "");
+    setFormCommissionTo("-");
 
     // Current timestamp for date and time
     const now = new Date();
@@ -1247,6 +1265,7 @@ function Dashboard({
     setFormSaleOverride(row.sale);
     setFormDate(row.date || "");
     setFormTime(row.time || "");
+    setFormCommissionTo(row.commissionTo || "-");
 
     // Use explicit splitCarry flag; fall back to old behaviour for legacy rows that lack the flag
     const wasSplit = row.splitCarry === true;
@@ -1316,9 +1335,10 @@ function Dashboard({
     const detailText = String(data.get("detail"));
     const dateVal = formDate || String(data.get("date")) || "";
     const timeVal = formTime || String(data.get("time")) || "";
-    const commissionToVal = String(data.get("commissionTo"));
+    const commissionToVal = formCommissionTo || String(data.get("commissionTo") || "-");
 
     const tmpl = dungeonTemplates.find((t) => t.id === formDungeonId) || selectedTemplate;
+    const isMaya = Boolean(tmpl && (tmpl.id.toLowerCase().includes("maya") || tmpl.name.toLowerCase().includes("maya")));
     const dungeonName = tmpl?.name || "ไม่ระบุ";
     const diffName = formDiffName || "";
 
@@ -1331,7 +1351,7 @@ function Dashboard({
       for (const t of tiersForSplit) {
         const assigned = tierPlayerMap[t.label] || [];
         if (assigned.length === 0) {
-          notify(`กรุณาเลือกคนแบกสำหรับชั้น ${t.label}`);
+          notify(isMaya ? `กรุณาเลือกคนแบกสำหรับ ${t.label}` : `กรุณาเลือกคนแบกสำหรับชั้น ${t.label}`);
           return;
         }
       }
@@ -1356,7 +1376,9 @@ function Dashboard({
 
     const allDiffTiers = selectedDiff?.tiers || [];
     const isAllSelected = allDiffTiers.length > 0 && selectedTiers.length === allDiffTiers.length;
-    const tierLbl = isAllSelected
+    const tierLbl = isMaya
+      ? selectedTiers.map((t) => t.label.replace(/^ชั้น\s*/i, "")).join(", ")
+      : isAllSelected
       ? `เหมา (ชั้น ${selectedTiers[0]?.label}-${selectedTiers[selectedTiers.length - 1]?.label})`
       : selectedTiers.map((t) => (t.label.startsWith("ชั้น") ? t.label : `ชั้น ${t.label}`)).join(", ");
 
@@ -1676,7 +1698,9 @@ function Dashboard({
     const perPlayer = row.players.length > 0
       ? row.players.reduce((sum, pid) => sum + getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount), 0) / row.players.length
       : (row.sale * (1 - commissionRate / 100)) / carryCount;
-    const diffLabel = [row.difficulty, row.tier].filter(Boolean).join(" · ");
+    const isMaya = Boolean(row.dungeon?.toLowerCase().includes("maya"));
+    const cleanTier = isMaya ? row.tier.replace(/ชั้น\s*/gi, "") : row.tier;
+    const diffLabel = [row.difficulty, cleanTier].filter(Boolean).join(" · ");
     return (
       <tr key={row.id}>
         <td>
@@ -1690,7 +1714,13 @@ function Dashboard({
         <td><strong>{row.ctm}</strong></td>
         <td>{row.detail}</td>
         <td className="money">฿{row.sale.toLocaleString()}</td>
-        <td className="commission">-฿{formatMoney((row.sale * commissionRate) / 100)} <small>({row.commissionTo})</small></td>
+        <td className="commission">
+          {row.commissionTo && row.commissionTo !== "-" ? (
+            <>-฿{formatMoney((row.sale * commissionRate) / 100)} <small>({row.commissionTo})</small></>
+          ) : (
+            <span style={{ color: "#94a3b8" }}>-</span>
+          )}
+        </td>
         <td className="players-cell">
           <button className="player-names" onClick={() => setSelectedRow(row)}>
             {row.players.map((id) => memberList.find((p) => p.id === id)?.name || id).join(", ") || "-"}
@@ -2484,11 +2514,14 @@ function Dashboard({
                                 <>
                                   <span className="diff-name">{diff.name || "ระดับเดียว"}</span>
                                   <div className="diff-tiers">
-                                    {diff.tiers.map((tier) => (
-                                      <span key={tier.label} className="diff-tier-chip">
-                                        ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · <strong>฿{tier.price.toLocaleString()}</strong>
-                                      </span>
-                                    ))}
+                                    {diff.tiers.map((tier) => {
+                                      const isTmplMaya = tmpl.id.toLowerCase().includes("maya") || tmpl.name.toLowerCase().includes("maya");
+                                      return (
+                                        <span key={tier.label} className="diff-tier-chip">
+                                          {isTmplMaya ? "" : "ชั้น "}{tier.label.replace(/^ชั้น\s*/i, "")} · <strong>฿{tier.price.toLocaleString()}</strong>
+                                        </span>
+                                      );
+                                    })}
                                   </div>
                                   <button
                                     type="button"
@@ -2840,13 +2873,8 @@ function Dashboard({
                     setFormDungeonId(e.target.value);
                     const firstDiff = tmpl?.difficulties[0];
                     setFormDiffName(firstDiff?.name || "");
-                    if (firstDiff) {
-                      setSelectedTiers([...firstDiff.tiers]);
-                      setFormSaleOverride(firstDiff.tiers.reduce((s, t) => s + t.price, 0));
-                    } else {
-                      setSelectedTiers([]);
-                      setFormSaleOverride(0);
-                    }
+                    setSelectedTiers([]);
+                    setFormSaleOverride(0);
                     setTierPlayerMap({});
                     setIsSplitCarry(false);
                   }}
@@ -2864,12 +2892,9 @@ function Dashboard({
                   <select
                     value={formDiffName}
                     onChange={(e) => {
-                      const diff = selectedTemplate.difficulties.find((d) => d.name === e.target.value);
                       setFormDiffName(e.target.value);
-                      if (diff) {
-                        setSelectedTiers([...diff.tiers]);
-                        setFormSaleOverride(diff.tiers.reduce((s, t) => s + t.price, 0));
-                      }
+                      setSelectedTiers([]);
+                      setFormSaleOverride(0);
                       setTierPlayerMap({});
                       setIsSplitCarry(false);
                     }}
@@ -2885,15 +2910,19 @@ function Dashboard({
               {selectedDiff && selectedDiff.tiers.length > 0 && (
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0 6px" }}>
-                    <strong style={{ fontSize: "13px" }}>เลือกชั้นที่ลง</strong>
+                    <strong style={{ fontSize: "13px" }}>
+                      {isMaya ? "เลือกระดับ/ชั้นที่ลง (เลือกได้ 1 รายการ)" : "เลือกชั้นที่ลง"}
+                    </strong>
                     <div style={{ display: "flex", gap: "6px" }}>
-                      <button type="button" className="tier-quick-btn" onClick={() => {
-                        // Select all tiers, replacing any partial selection
-                        const all = [...selectedDiff.tiers];
-                        setSelectedTiers(all);
-                        setFormSaleOverride(all.reduce((s, t) => s + t.price, 0));
-                        setTierPlayerMap({});
-                      }}>เหมาทุกชั้น</button>
+                      {!isMaya && (
+                        <button type="button" className="tier-quick-btn" onClick={() => {
+                          // Select all tiers, replacing any partial selection
+                          const all = [...selectedDiff.tiers];
+                          setSelectedTiers(all);
+                          setFormSaleOverride(all.reduce((s, t) => s + t.price, 0));
+                          setTierPlayerMap({});
+                        }}>เหมาทุกชั้น</button>
+                      )}
                       <button type="button" className="tier-quick-btn" onClick={() => {
                         setSelectedTiers([]);
                         setFormSaleOverride(0);
@@ -2911,6 +2940,15 @@ function Dashboard({
                           type="button"
                           className={`tier-chip-btn${isSelected ? " selected" : ""}`}
                           onClick={() => {
+                            if (isMaya) {
+                              // Maya can ONLY select ONE tier at a time!
+                              const next = isSelected ? [] : [tier];
+                              setSelectedTiers(next);
+                              setFormSaleOverride(next.reduce((s, t) => s + t.price, 0));
+                              setTierPlayerMap({});
+                              return;
+                            }
+
                             let next: DungeonTier[];
                             if (isSelected) {
                               // Deselect this tier
@@ -2934,7 +2972,9 @@ function Dashboard({
                             setTierPlayerMap(newMap);
                           }}
                         >
-                          <span className="tier-chip-label">ชั้น {tier.label.replace(/^ชั้น\s*/i, "")}</span>
+                          <span className="tier-chip-label">
+                            {isMaya ? tier.label.replace(/^ชั้น\s*/i, "") : `ชั้น ${tier.label.replace(/^ชั้น\s*/i, "")}`}
+                          </span>
                           <span className="tier-chip-price">฿{tier.price.toLocaleString()}/คน</span>
                         </button>
                       );
@@ -3021,7 +3061,12 @@ function Dashboard({
 
               <label className="field">
                 <span>ผู้ได้รับค่าคอมมิชชั่น {commissionRate}% (คนหาลูกค้า)</span>
-                <select name="commissionTo" defaultValue={editRow?.commissionTo ?? memberList[0]?.name}>
+                <select
+                  name="commissionTo"
+                  value={formCommissionTo}
+                  onChange={(e) => setFormCommissionTo(e.target.value)}
+                >
+                  <option value="-">-</option>
                   {memberList.map((p) => (
                     <option key={p.id} value={p.name}>{p.name}</option>
                   ))}
@@ -3169,7 +3214,7 @@ function Dashboard({
                                         }}
                                       >
                                         <span style={{ color: "#374151" }}>
-                                          ชั้น {fl.label.replace(/^ชั้น\s*/i, "")}
+                                          {isMaya ? "" : "ชั้น "}{fl.label.replace(/^ชั้น\s*/i, "")}
                                           {scale !== 1 && (
                                             <small style={{ color: "#6b7280", marginLeft: "3px" }}>
                                               (฿{formatMoney(floorPrice)})
@@ -3234,7 +3279,7 @@ function Dashboard({
                             <div key={tier.label} className="tier-assign-card">
                               <div className="tier-assign-head">
                                 <strong>
-                                  ชั้น {tier.label.replace(/^ชั้น\s*/i, "")} · ฿{formatMoney(tierPriceScaled)}/คน
+                                  {isMaya ? "" : "ชั้น "}{tier.label.replace(/^ชั้น\s*/i, "")} · ฿{formatMoney(tierPriceScaled)}/คน
                                   {scale !== 1 && (
                                     <small style={{ color: "#64748b", fontWeight: 400, marginLeft: "4px" }}>
                                       (ฐาน ฿{tier.price})
