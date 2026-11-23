@@ -742,6 +742,8 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   // Payment form: multi-tier selection & split-carry assignments
   const [formDungeonId, setFormDungeonId] = useState<string>("");
   const [formDiffName, setFormDiffName] = useState<string>("");
+  const [formDate, setFormDate] = useState<string>("");
+  const [formTime, setFormTime] = useState<string>("");
   const [selectedTiers, setSelectedTiers] = useState<DungeonTier[]>([]);
   const [isSplitCarry, setIsSplitCarry] = useState<boolean>(false);
   const [tierPlayerMap, setTierPlayerMap] = useState<Record<string, string[]>>({});
@@ -1123,6 +1125,15 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     const firstDiff = firstTemplate?.difficulties[0];
     setFormDungeonId(firstTemplate?.id || "");
     setFormDiffName(firstDiff?.name || "");
+
+    // Current timestamp for date and time
+    const now = new Date();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const dStr = `${now.getDate()}-${months[now.getMonth()]}`;
+    const tStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setFormDate(dStr);
+    setFormTime(tStr);
+
     // Start with no tiers selected — user picks manually
     setSelectedTiers([]);
     setFormSaleOverride(0);
@@ -1135,6 +1146,8 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     setFormDungeonId(tmpl?.id || "");
     setFormDiffName(row.difficulty || "");
     setFormSaleOverride(row.sale);
+    setFormDate(row.date || "");
+    setFormTime(row.time || "");
 
     // Use explicit splitCarry flag; fall back to old behaviour for legacy rows that lack the flag
     const wasSplit = row.splitCarry === true;
@@ -1202,8 +1215,8 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
     const saleAmount = Number(data.get("sale")) || formSaleOverride || 0;
     const ctmName = String(data.get("ctm"));
     const detailText = String(data.get("detail"));
-    const dateVal = String(data.get("date"));
-    const timeVal = String(data.get("time"));
+    const dateVal = formDate || String(data.get("date")) || "";
+    const timeVal = formTime || String(data.get("time")) || "";
     const commissionToVal = String(data.get("commissionTo"));
 
     const tmpl = dungeonTemplates.find((t) => t.id === formDungeonId) || selectedTemplate;
@@ -2596,11 +2609,24 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
               <div className="form-grid">
                 <label className="field">
                   <span>วันที่</span>
-                  <input name="date" type="text" required defaultValue={editRow?.date ?? "23-Nov"} placeholder="เช่น 23-Nov" />
+                  <input
+                    name="date"
+                    type="text"
+                    required
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
+                    placeholder="เช่น 24-Nov"
+                  />
                 </label>
                 <label className="field">
                   <span>เวลา</span>
-                  <input name="time" type="time" required defaultValue={editRow?.time ?? "21:00"} />
+                  <input
+                    name="time"
+                    type="time"
+                    required
+                    value={formTime}
+                    onChange={(e) => setFormTime(e.target.value)}
+                  />
                 </label>
               </div>
 
