@@ -770,6 +770,9 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   const [editDiffNameVal, setEditDiffNameVal] = useState<string>("");
   const [editDiffTiers, setEditDiffTiers] = useState<DungeonTier[]>([]);
 
+  // User accounts list for Admin management
+  const [userAccounts, setUserAccounts] = useState<{ id: string; username: string; role: Role }[]>([]);
+
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2500);
@@ -870,12 +873,27 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
       setLogs(data.slice(0, 40));
     });
 
+    // 5. Sync User Accounts (for Admin management)
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const data: { id: string; username: string; role: Role }[] = [];
+      snapshot.forEach((d) => {
+        const val = d.data();
+        data.push({
+          id: d.id,
+          username: val.username || d.id,
+          role: (val.role as Role) || "member",
+        });
+      });
+      setUserAccounts(data);
+    }, (err) => console.error("Users sync error:", err));
+
     return () => {
       unsubRuns();
       unsubPlayers();
       unsubSettings();
       unsubDungeons();
       unsubLogs();
+      unsubUsers();
     };
   }, []);
 
@@ -1307,6 +1325,59 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
       setShowMemberForm(false);
     } catch (err: any) {
       alert("เพิ่มสมาชิกไม่สำเร็จ: " + err.message);
+    }
+  };
+
+  const handleDeleteMember = async (player: Player) => {
+    if (!confirm(`ยืนยันลบสมาชิก "${player.name}" ออกจากทีม?`)) return;
+    try {
+      if (player.id && !player.id.startsWith("p") && !player.id.startsWith("ext_")) {
+        await deleteDoc(doc(db, "players", player.id));
+      } else {
+        const q = query(collection(db, "players"), where("name", "==", player.name));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          for (const d of snap.docs) {
+            await deleteDoc(doc(db, "players", d.id));
+          }
+        } else {
+          try {
+            await deleteDoc(doc(db, "players", player.id));
+          } catch (_) {}
+        }
+      }
+      setMemberList((prev) => prev.filter((p) => p.id !== player.id && p.name !== player.name));
+      await addLog("ลบสมาชิก", player.name, "สมาชิก");
+      notify(`ลบสมาชิก "${player.name}" เรียบร้อยแล้ว`);
+    } catch (err: any) {
+      alert("เกิดข้อผิดพลาดในการลบสมาชิก: " + err.message);
+    }
+  };
+
+  const handleDeleteUserAccount = async (u: { id: string; username: string; role: Role }) => {
+    if (u.username === username) {
+      alert("ไม่สามารถลบบัญชีของตัวเองที่กำลังล็อกอินอยู่ได้");
+      return;
+    }
+    if (!confirm(`ยืนยันลบบัญชีผู้ใช้ "${u.username}" ออกจากระบบ?`)) return;
+    try {
+      await deleteDoc(doc(db, "users", u.id));
+      await addLog("ลบบัญชีผู้ใช้", u.username, "ระบบ");
+      notify(`ลบบัญชีผู้ใช้ "${u.username}" แล้ว`);
+    } catch (err: any) {
+      alert("เกิดข้อผิดพลาดในการลบบัญชี: " + err.message);
+    }
+  };
+
+  const handleToggleUserRole = async (u: { id: string; username: string; role: Role }) => {
+    const newRole: Role = u.role === "admin" ? "member" : "admin";
+    if (!confirm(`ต้องการเปลี่ยนยศของ "${u.username}" เป็น ${newRole.toUpperCase()} หรือไม่?`)) return;
+    try {
+      await updateDoc(doc(db, "users", u.id), { role: newRole });
+      await addLog("เปลี่ยนยศผู้ใช้", `${u.username} → ${newRole}`, "ระบบ");
+      notify(`เปลี่ยนยศเป็น ${newRole} เรียบร้อยแล้ว`);
+    } catch (err: any) {
+      alert("เกิดข้อผิดพลาด: " + err.message);
     }
   };
 
@@ -1835,7 +1906,31 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                         <span className="member-avatar" style={{ background: player.color }}>
                           {player.name.replace("K.", "").trim().slice(0, 1)}
                         </span>
-                        <span className="status-dot">พร้อมแบก</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "auto" }}>
+                          <span className="status-dot">พร้อมแบก</span>
+                          {role === "admin" && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMember(player)}
+                              style={{
+                                border: 0,
+                                background: "#fee2e2",
+                                color: "#dc2626",
+                                borderRadius: "6px",
+                                width: "28px",
+                                height: "28px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                transition: "all 0.15s"
+                              }}
+                              title={`ลบสมาชิก ${player.name}`}
+                            >
+                              {icons.trash}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <h3>{player.name}</h3>
                       <p>สมาชิกทีม 47Ravenge</p>
@@ -2348,12 +2443,120 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                       <strong style={{ fontSize: "12px", display: "block" }}>การจัดการ Role ผู้ใช้</strong>
                       <small style={{ color: "#555", lineHeight: 1.5, display: "block", marginTop: "2px" }}>
                         สมาชิกที่สมัครผ่านหน้า Register จะได้ยศ <code>member</code> โดยอัตโนมัติ<br />
-                        Admin สามารถอัปเกรด Role เป็น <code>admin</code> ได้ผ่าน Firebase Console → users collection
+                        Admin สามารถเปลี่ยนยศเป็น <code>admin</code> หรือลบบัญชีผู้ใช้ได้จากการจัดการบัญชีด้านล่าง
                       </small>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Card 4: User Accounts Management */}
+              {role === "admin" && (
+                <div className="settings-card">
+                  <div className="settings-title">
+                    <div className="settings-icon">👥</div>
+                    <div>
+                      <h2>จัดการบัญชีผู้ใช้งานระบบ (User Accounts)</h2>
+                      <p>รายชื่อผู้ใช้งานทั้งหมดที่สมัครเข้ามาในระบบ สามารถเปลี่ยนยศ หรือลบบัญชีผู้ใช้ได้</p>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: "16px" }}>
+                    {userAccounts.length === 0 ? (
+                      <p style={{ color: "#888", fontSize: "13px", textAlign: "center", padding: "16px" }}>
+                        ยังไม่มีบัญชีผู้ใช้งานที่ลงทะเบียนผ่านหน้าสมัครสมาชิก
+                      </p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {userAccounts.map((u) => (
+                          <div
+                            key={u.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 14px",
+                              background: "#f8fafc",
+                              borderRadius: "8px",
+                              border: "1px solid #dce4ec"
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <span style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "50%",
+                                background: u.role === "admin" ? "#dc2626" : "#176bca",
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: 700,
+                                fontSize: "13px"
+                              }}>
+                                {u.username.slice(0, 1).toUpperCase()}
+                              </span>
+                              <div>
+                                <strong style={{ fontSize: "13px", display: "block" }}>
+                                  {u.username}
+                                  {u.username === username && (
+                                    <small style={{ color: "#16a34a", marginLeft: "6px", fontWeight: 600 }}>(บัญชีปัจจุบัน)</small>
+                                  )}
+                                </strong>
+                                <span style={{
+                                  fontSize: "11px",
+                                  fontWeight: 600,
+                                  color: u.role === "admin" ? "#dc2626" : "#2563eb",
+                                  background: u.role === "admin" ? "#fee2e2" : "#dbeafe",
+                                  padding: "2px 8px",
+                                  borderRadius: "4px"
+                                }}>
+                                  {u.role === "admin" ? "🛡️ ผู้ดูแล (Admin)" : "👤 สมาชิก (Member)"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleUserRole(u)}
+                                className="outline-button"
+                                style={{ height: "32px", fontSize: "12px", padding: "0 10px" }}
+                                title="สลับยศ Admin / Member"
+                              >
+                                {u.role === "admin" ? "เปลี่ยนเป็น Member" : "เลื่อนขั้นเป็น Admin"}
+                              </button>
+                              {u.username !== username && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUserAccount(u)}
+                                  style={{
+                                    border: 0,
+                                    background: "#fee2e2",
+                                    color: "#dc2626",
+                                    borderRadius: "6px",
+                                    padding: "0 10px",
+                                    height: "32px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: 600
+                                  }}
+                                  title={`ลบบัญชี ${u.username}`}
+                                >
+                                  {icons.trash} ลบผู้ใช้
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         )}
