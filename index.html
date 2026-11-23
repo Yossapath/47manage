@@ -32,6 +32,11 @@
     ::-webkit-scrollbar-track { background: #f1f5f9; }
     ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
     .table-cell-border { border: 1px solid #cbd5e1; }
+    #dungeonTable th, #dungeonTable td {
+      white-space: nowrap !important;
+      word-break: keep-all !important;
+      overflow-wrap: normal !important;
+    }
     .touch-active:active { transform: scale(0.97); opacity: 0.85; }
     @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
     .animate-fade-up { animation: fadeUp .25s ease-out both; }
@@ -90,8 +95,8 @@
       <button onclick="clearAllRuns()" class="px-2.5 py-1.5 text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition touch-active flex items-center gap-1 shadow-sm">
         <span>🗑️ เคลียร์ข้อมูลตาราง</span>
       </button>
-      <button onclick="seedInitialDataToFirestore()" class="px-2 py-1.5 text-[11px] font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition touch-active">
-        โหลดตัวอย่าง 10 รอบ
+      <button onclick="openLogModal()" class="px-2.5 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition touch-active flex items-center gap-1 shadow-sm">
+        <span>📋 ดู Log</span>
       </button>
     </div>
   </div>
@@ -99,13 +104,8 @@
 
 <!-- ========== FIREBASE NOTICE BANNER ========== -->
 <div id="firebaseNoticeBanner" class="hidden bg-sky-50 border-b border-sky-200 text-sky-900 px-3 sm:px-6 py-2 text-xs">
-  <div class="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+  <div class="w-full max-w-7xl mx-auto flex items-center justify-between gap-2">
     <div class="flex items-center gap-2"><span>🔥</span><span id="firebaseNoticeText"></span></div>
-    <div id="bannerActionGroup" class="flex items-center gap-2">
-      <button id="btnSeedFirestore" onclick="seedInitialDataToFirestore()" class="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm transition touch-active text-xs whitespace-nowrap">
-        🚀 ซิงค์ข้อมูลตัวอย่าง 10 รอบ
-      </button>
-    </div>
   </div>
 </div>
 
@@ -513,6 +513,27 @@
   </div>
 </div>
 
+<!-- Log Modal -->
+<div id="logModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-fade-up" style="max-height:85vh;">
+    <div class="p-4 bg-gradient-to-r from-slate-700 to-slate-900 text-white flex items-center justify-between sticky top-0 z-10">
+      <div>
+        <h3 class="font-bold text-sm flex items-center gap-2">📋 Log ประวัติการดำเนินการ</h3>
+        <p class="text-[11px] text-slate-300">บันทึกการเพิ่ม/ลบ/เคลียร์ข้อมูล</p>
+      </div>
+      <button onclick="closeLogModal()" class="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition text-sm">✕</button>
+    </div>
+    <div class="p-3 overflow-y-auto" style="max-height:65vh;">
+      <div id="logList" class="space-y-2 text-xs">
+        <p class="text-slate-400 text-center py-6">⏳ กำลังโหลด...</p>
+      </div>
+    </div>
+    <div class="p-3 border-t border-slate-100 flex justify-end">
+      <button onclick="closeLogModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium text-xs transition touch-active">ปิด</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== SCRIPT ========== -->
 <script>
 // Firebase Config
@@ -543,19 +564,7 @@ const DEFAULT_PLAYERS = [
 ];
 let PLAYERS = [...DEFAULT_PLAYERS];
 
-// Initial sample data
-const INITIAL_RUNS=[
-  {order:1,paymentDate:'23-Nov',date:'16-Nov',time:'22:43',customer:'47family',price:600,detail:'Apo NM 1-5',saleBy:'Top',carryPlayers:['Top','Beer','Jamejet','Yugi'],playerSplits:{Top:135,Beer:135,Jamejet:135,Yugi:135},slipUrl:null},
-  {order:2,paymentDate:'23-Nov',date:'17-Nov',time:'22:44',customer:'47family',price:400,detail:'Apo NM 3-5',saleBy:'Sprite',carryPlayers:['Jamepii','Joss','Sprite','Tew'],playerSplits:{Jamepii:90,Joss:90,Sprite:90,Tew:90},slipUrl:null},
-  {order:3,paymentDate:'23-Nov',date:'18-Nov',time:'18:00',customer:'47family',price:500,detail:'Apo NM 1-5',saleBy:'Top',carryPlayers:['Top','Jamepii','Beer','Jamejet'],playerSplits:{Top:112.5,Jamepii:112.5,Beer:112.5,Jamejet:112.5},slipUrl:null},
-  {order:4,paymentDate:'23-Nov',date:'18-Nov',time:'23:00',customer:'47family',price:600,detail:'Apo NM 1-5',saleBy:'Top',carryPlayers:['Top','Jamepii','Beer','Jamejet'],playerSplits:{Top:135,Jamepii:135,Beer:135,Jamejet:135},slipUrl:null},
-  {order:5,paymentDate:'23-Nov',date:'19-Nov',time:'20:40',customer:'47family',price:500,detail:'Apo NM 3-5',saleBy:'Top',carryPlayers:['Top','Jamepii','Beer','Jamejet'],playerSplits:{Top:112.5,Jamepii:112.5,Beer:112.5,Jamejet:112.5},slipUrl:null},
-  {order:6,paymentDate:'23-Nov',date:'19-Nov',time:'23:33',customer:'New',price:300,detail:'Maya 2',saleBy:'Jamepii',carryPlayers:['Top','Jamepii','Beer','Jamejet'],playerSplits:{Top:67.5,Jamepii:67.5,Beer:67.5,Jamejet:67.5},slipUrl:null},
-  {order:7,paymentDate:'23-Nov',date:'20-Nov',time:'18:44',customer:'47family',price:300,detail:'Maya 2',saleBy:'Top',carryPlayers:['Top','Beer','Tew','Yugi','Sprite'],playerSplits:{Top:67.5,Beer:67.5,Tew:67.5,Yugi:33.75,Sprite:33.75},slipUrl:null},
-  {order:8,paymentDate:'23-Nov',date:'21-Nov',time:'09:43',customer:'47family',price:200,detail:'Apo NM 1-2',saleBy:'Sprite',carryPlayers:['Jamepii','Beer','Joss','Sprite'],playerSplits:{Jamepii:45,Beer:45,Joss:45,Sprite:45},slipUrl:null},
-  {order:9,paymentDate:'23-Nov',date:'21-Nov',time:'10:27',customer:'47family',price:200,detail:'Apo NM 5',saleBy:'Sprite',carryPlayers:['Jamepii','Beer','Joss','Sprite'],playerSplits:{Jamepii:45,Beer:45,Joss:45,Sprite:45},slipUrl:null},
-  {order:10,paymentDate:'23-Nov',date:'22-Nov',time:'15:52',customer:'47family',price:400,detail:'Apo NM 1-5',saleBy:'Sprite',carryPlayers:['Jamepii','Yugi','Joss','Sprite'],playerSplits:{Jamepii:90,Yugi:90,Joss:90,Sprite:90},slipUrl:null}
-];
+// Initial sample data (ลบออกแล้ว — เริ่มด้วยตารางว่างเปล่า)
 
 // State
 let runs = [], selectedPlayerFilter = null, currentSlipBase64 = null;
@@ -599,9 +608,7 @@ function setupRealtimeFirestore() {
     badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span>Firebase Online</span>';
 
     if (snap.empty) {
-      banner.classList.remove('hidden');
-      document.getElementById('firebaseNoticeText').textContent = "เชื่อมต่อ Firestore สำเร็จ แต่ตารางยังว่างอยู่ กดปุ่มเพื่อซิงค์ข้อมูลตัวอย่าง หรือเริ่มเพิ่มรอบใหม่ได้เลย";
-      document.getElementById('bannerActionGroup').classList.remove('hidden');
+      banner.classList.add('hidden');
       runs = [];
     } else {
       banner.classList.add('hidden');
@@ -713,6 +720,7 @@ async function handleAddNewPlayer(e) {
   if (isFirebaseReady) {
     try {
       await db.collection("players").doc(cleanId).set(newPlayerObj);
+      await writeLog('ADD_PLAYER', `เพิ่มคนงานใหม่: ${formattedName} (ID: ${cleanId})`);
       input.value = '';
     } catch(err) {
       alert('เพิ่มคนงานไม่สำเร็จ: ' + err.message);
@@ -738,6 +746,7 @@ async function deletePlayer(id) {
   if (isFirebaseReady) {
     try {
       await db.collection("players").doc(id).delete();
+      await writeLog('DELETE_PLAYER', `ลบคนงาน: ${targetName} (ID: ${id})`);
     } catch(err) {
       alert('ลบไม่สำเร็จ: ' + err.message);
     }
@@ -783,27 +792,25 @@ async function resetDefaultPlayers() {
 
 // ========== CLEAR TABLE (ล้างตารางทั้งหมด) ==========
 async function clearAllRuns() {
-  if (!confirm('⚠️ คำเตือน: คุณต้องการลบข้อมูลรอบดันเจี้ยนทั้งหมดในตารางใช่หรือไม่?\n\n(ตารางจะถูกล้างยอดเป็น ฿0 เพื่อเริ่มต้นสัปดาห์ใหม่)')) return;
+  if (!confirm('⚠️ คำเตือน: ลบข้อมูลรอบดันเจี้ยนทั้งหมดใช่หรือไม่?\n\n(ตารางจะว่างเปล่า เพื่อเริ่มสัปดาห์ใหม่)')) return;
 
   if (isFirebaseReady) {
     try {
       const snap = await db.collection("runs").get();
-      if (snap.empty) {
-        alert('ตารางว่างอยู่แล้ว ไม่มีข้อมูลให้ล้าง');
-        return;
-      }
+      if (snap.empty) { alert('ตารางว่างอยู่แล้ว'); return; }
       const batch = db.batch();
       snap.forEach(doc => batch.delete(doc.ref));
       await batch.commit();
-      alert('🗑️ เคลียร์ข้อมูลรอบดันเจี้ยนในตารางทั้งหมดเรียบร้อยแล้ว!');
+      await writeLog('CLEAR_ALL', `เคลียร์ตารางทั้งหมด ${snap.size} รอบ`);
+      alert('🗑️ เคลียร์ข้อมูลทั้งหมดเรียบร้อยแล้ว!');
     } catch(err) {
-      alert('เกิดข้อผิดพลาดในการล้างตาราง: ' + err.message);
+      alert('เกิดข้อผิดพลาด: ' + err.message);
     }
   } else {
     runs = [];
     saveLocal();
     renderAll();
-    alert('🗑️ เคลียร์ข้อมูลรอบดันเจี้ยนในตารางทั้งหมดเรียบร้อยแล้ว!');
+    alert('🗑️ เคลียร์ข้อมูลเรียบร้อยแล้ว!');
   }
 }
 
@@ -830,26 +837,73 @@ function setTableViewMode(mode) {
 
 function fallbackLocal() {
   const s = localStorage.getItem('dg_runs_v2');
-  if (s) { try { runs = JSON.parse(s); } catch(e) { runs = [...INITIAL_RUNS]; } }
-  else { runs = [...INITIAL_RUNS]; }
+  if (s) { try { runs = JSON.parse(s); } catch(e) { runs = []; } }
+  else { runs = []; }
   renderAll();
 }
 
 function saveLocal() { localStorage.setItem('dg_runs_v2', JSON.stringify(runs)); }
 
-async function seedInitialDataToFirestore() {
-  if (!isFirebaseReady) { alert('Firebase ยังไม่พร้อม'); return; }
-  const btn = document.getElementById('btnSeedFirestore');
-  if (btn) btn.textContent = '⏳ กำลังซิงค์...';
+// ========== LOGGING ==========
+async function writeLog(action, detail) {
+  if (!isFirebaseReady || !currentUser) return;
   try {
-    const batch = db.batch();
-    for (const r of INITIAL_RUNS) batch.set(db.collection("runs").doc('seed_'+r.order), {...r, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
-    await batch.commit();
-    alert('🎉 ซิงค์ข้อมูล 10 รอบขึ้น Firebase สำเร็จ!');
-  } catch(e) {
-    alert('ซิงค์ไม่สำเร็จ: ' + e.message + '\n\nไปที่ Firebase Console -> Firestore -> Rules แล้วตั้งค่า allow read, write: if true;');
-    runs = [...INITIAL_RUNS]; saveLocal(); renderAll();
-  } finally { if (btn) btn.textContent = '🚀 ซิงค์ข้อมูลตัวอย่าง 10 รอบ'; }
+    await db.collection('logs').add({
+      action,
+      detail,
+      by: currentUser.displayName || currentUser.email,
+      uid: currentUser.uid,
+      at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch(e) { console.warn('Log error:', e); }
+}
+
+function openLogModal() {
+  document.getElementById('logModal').classList.remove('hidden');
+  loadLogs();
+}
+
+function closeLogModal() {
+  document.getElementById('logModal').classList.add('hidden');
+}
+
+function loadLogs() {
+  const listEl = document.getElementById('logList');
+  if (!isFirebaseReady) {
+    listEl.innerHTML = '<p class="text-rose-500 text-center py-4">Firebase ยังไม่พร้อม</p>';
+    return;
+  }
+  listEl.innerHTML = '<p class="text-slate-400 text-center py-4">⏳ กำลังโหลด Log...</p>';
+
+  db.collection("logs").orderBy("at", "desc").limit(50).onSnapshot(snap => {
+    if (snap.empty) {
+      listEl.innerHTML = '<p class="text-slate-400 text-center py-6">ยังไม่มีประวัติ Log</p>';
+      return;
+    }
+    listEl.innerHTML = snap.docs.map(doc => {
+      const d = doc.data();
+      const timeStr = d.at && d.at.toDate ? d.at.toDate().toLocaleString('th-TH') : 'เมื่อสักครู่';
+      let badgeCls = 'bg-slate-100 text-slate-700';
+      if (d.action === 'ADD_RUN') badgeCls = 'bg-emerald-100 text-emerald-800 font-bold';
+      else if (d.action === 'DELETE_RUN') badgeCls = 'bg-rose-100 text-rose-800 font-bold';
+      else if (d.action === 'CLEAR_ALL') badgeCls = 'bg-red-200 text-red-900 font-bold';
+      else if (d.action === 'ADD_PLAYER') badgeCls = 'bg-indigo-100 text-indigo-800 font-bold';
+      else if (d.action === 'DELETE_PLAYER') badgeCls = 'bg-amber-100 text-amber-800 font-bold';
+
+      return `
+        <div class="p-2.5 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="text-[10px] px-2 py-0.5 rounded-full ${badgeCls}">${d.action}</span>
+            <span class="text-[10px] text-slate-400">${timeStr}</span>
+          </div>
+          <p class="text-xs text-slate-800 font-medium">${d.detail || ''}</p>
+          <p class="text-[10px] text-slate-500">โดย: <span class="font-semibold text-slate-700">${d.by || 'ไม่ระบุ'}</span></p>
+        </div>
+      `;
+    }).join('');
+  }, err => {
+    listEl.innerHTML = `<p class="text-rose-500 text-center py-3">เกิดข้อผิดพลาด: ${err.message}</p>`;
+  });
 }
 
 // ========== ADMIN APPROVAL SYSTEM ==========
@@ -1163,7 +1217,11 @@ function renderDesktopTable(computed, totalPrice, totalCom, pw, pc) {
   const tbody = document.getElementById('tableBody');
   const tfoot = document.getElementById('tableFoot');
 
-  tbody.innerHTML = computed.map(r => {
+  if (computed.length === 0) {
+    const totalCols = 11 + PLAYERS.length + (isAdmin ? 1 : 0);
+    tbody.innerHTML = `<tr><td colspan="${totalCols}" class="py-12 px-4 text-center text-slate-400 bg-white"><div class="flex flex-col items-center justify-center space-y-1"><span class="text-2xl">📋</span><p class="font-bold text-sm text-slate-600">ยังไม่มีข้อมูลรอบดันเจี้ยนในตาราง</p><p class="text-xs text-slate-400">เมื่อแอดมินกด "+ เพิ่มรอบดันเจี้ยน" ข้อมูลจะปรากฏที่นี่</p></div></td></tr>`;
+  } else {
+    tbody.innerHTML = computed.map(r => {
     const isSel = selectedPlayerFilter && ((r.playerSplits && r.playerSplits[selectedPlayerFilter] > 0) || r.saleBy === selectedPlayerFilter);
     let cls = 'bg-white hover:bg-slate-50';
     if (selectedPlayerFilter) cls = isSel ? 'bg-amber-50/70 hover:bg-amber-100/70 font-semibold' : 'opacity-40 hover:opacity-80';
@@ -1195,6 +1253,7 @@ function renderDesktopTable(computed, totalPrice, totalCom, pw, pc) {
       ${adminCell}
     </tr>`;
   }).join('');
+  }
 
   const adminFoot = (isAdmin) ? '<td class="table-cell-border bg-slate-200 admin-col whitespace-nowrap"></td>' : '';
   const wCells = PLAYERS.map(p => `<td class="py-2 px-1.5 table-cell-border text-center font-bold bg-sky-100 whitespace-nowrap">${pw[p.id]>0?pw[p.id].toFixed(2):'-'}</td>`).join('');
@@ -1222,6 +1281,18 @@ function renderMobileCards(computed, totalPrice, totalCom, pw, pc) {
   const container = document.getElementById('mobileCardList');
   const summaryEl = document.getElementById('mobileSummarySection');
 
+  if (computed.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white rounded-xl p-8 text-center text-slate-400 border border-slate-200">
+        <span class="text-3xl block mb-2">📋</span>
+        <p class="font-bold text-sm text-slate-700">ยังไม่มีข้อมูลรอบดันเจี้ยน</p>
+        <p class="text-xs text-slate-400 mt-1">ตารางจะอัปเดตอัตโนมัติเมื่อแอดมินกดเพิ่มรอบ</p>
+      </div>
+    `;
+    summaryEl.innerHTML = '';
+    return;
+  }
+
   container.innerHTML = computed.map(r => {
     const isSel = selectedPlayerFilter && ((r.playerSplits && r.playerSplits[selectedPlayerFilter] > 0) || r.saleBy === selectedPlayerFilter);
     let cardCls = 'bg-white border-slate-200';
@@ -1231,7 +1302,7 @@ function renderMobileCards(computed, totalPrice, totalCom, pw, pc) {
     const playerTags = playersInRun.map(p => {
       const a = Number(r.playerSplits[p.id]);
       const isSP = selectedPlayerFilter === p.id;
-      return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${isSP?'bg-amber-200 text-amber-900 font-bold':'bg-slate-100 text-slate-700'}">${p.name} <span class="font-semibold">฿${a.toFixed(0)}</span></span>`;
+      return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap ${isSP?'bg-amber-200 text-amber-900 font-bold':'bg-slate-100 text-slate-700'}">${p.name} <span class="font-semibold">฿${a.toFixed(0)}</span></span>`;
     }).join('');
 
     const slipBtn = r.slipUrl ? `<button onclick="viewSlip('${r.id}')" class="text-emerald-700 text-[11px] underline">ดูสลิป</button>` : '';
@@ -1239,15 +1310,15 @@ function renderMobileCards(computed, totalPrice, totalCom, pw, pc) {
 
     return `<div class="rounded-xl p-3 shadow-sm border ${cardCls} transition-all animate-fade-up space-y-2">
       <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 min-w-0">
-          <span class="text-[10px] text-slate-500">${r.date} ${r.time}</span>
-          <span class="text-xs font-bold text-slate-800 truncate">${r.detail}</span>
+        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+          <span class="text-[10px] text-slate-500 whitespace-nowrap">${r.date} ${r.time}</span>
+          <span class="text-xs font-bold text-slate-800 whitespace-nowrap">${r.detail}</span>
         </div>
         <span class="text-sm font-extrabold text-slate-900 whitespace-nowrap">฿${r.price.toFixed(0)}</span>
       </div>
-      <div class="flex items-center justify-between gap-2 text-[11px]">
-        <span class="text-slate-600">ลูกค้า: <span class="font-semibold text-slate-800">${r.customer}</span></span>
-        <span class="text-indigo-600 font-semibold">คอม 10% ฿${r.com.toFixed(0)} → ${r.saleBy}</span>
+      <div class="flex items-center justify-between gap-2 text-[11px] flex-wrap">
+        <span class="text-slate-600 whitespace-nowrap">ลูกค้า: <span class="font-semibold text-slate-800">${r.customer}</span></span>
+        <span class="text-indigo-600 font-semibold whitespace-nowrap">คอม 10% ฿${r.com.toFixed(0)} → ${r.saleBy}</span>
       </div>
       <div class="flex flex-wrap gap-1">${playerTags}</div>
       <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
@@ -1324,7 +1395,8 @@ async function handleSaveRun(e) {
   btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...';
   try {
     if (isFirebaseReady) {
-      await db.collection("runs").add({...data, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+      const docRef = await db.collection("runs").add({...data, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+      await writeLog('ADD_RUN', `เพิ่มรอบ: ${data.detail} | ฿${data.price} | ลูกค้า: ${data.customer} | id: ${docRef.id}`);
     } else {
       data.id = 'run-'+Date.now(); runs.push(data); saveLocal(); renderAll();
     }
@@ -1334,10 +1406,13 @@ async function handleSaveRun(e) {
 }
 
 async function deleteRun(id) {
-  if (!confirm('ลบรายการนี้?')) return;
+  const r = runs.find(x => x.id === id);
+  if (!confirm(`ลบรายการ "${r ? r.detail : id}" (฿${r ? r.price : '?'}) หรือไม่?`)) return;
   try {
-    if (isFirebaseReady && !id.startsWith('run-')) await db.collection("runs").doc(id).delete();
-    else { runs = runs.filter(r => r.id !== id); saveLocal(); renderAll(); }
+    if (isFirebaseReady && !id.startsWith('run-')) {
+      await db.collection("runs").doc(id).delete();
+      await writeLog('DELETE_RUN', `ลบรอบ: ${r ? r.detail : id} | ฿${r ? r.price : '?'} | ลูกค้า: ${r ? r.customer : '?'}`);
+    } else { runs = runs.filter(x => x.id !== id); saveLocal(); renderAll(); }
   } catch(e) { alert('ลบไม่ได้: '+e.message); }
 }
 

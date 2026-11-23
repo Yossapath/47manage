@@ -40,9 +40,17 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if isSignedIn() && request.auth.uid == userId
-                    && request.resource.data.role == 'member';  // force role=member on register
-      allow update: if isAdmin();  // only admin can update (including role changes)
+                    && request.resource.data.role == 'member';
+      allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // ===== logs collection =====
+    // Signed-in users can read and create logs; no one can edit or delete logs
+    match /logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
   }
 }
