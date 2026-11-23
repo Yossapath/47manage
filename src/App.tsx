@@ -1308,21 +1308,31 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
   // ======================== ADD MEMBER ========================
   const addMember = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!newMemberName.trim()) {
+    const nameToAdd = newMemberName.trim();
+    if (!nameToAdd) {
       notify("กรุณากรอกชื่อสมาชิก");
       return;
     }
     const color = PLAYER_COLORS[memberList.length % PLAYER_COLORS.length];
+    
+    // Close modal immediately so the UI is responsive and never hangs
+    setShowMemberForm(false);
+    setNewMemberName("");
+    notify(`กำลังเพิ่ม "${nameToAdd}" เข้าทีม...`);
+
     try {
       await addDoc(collection(db, "players"), {
-        name: newMemberName.trim(),
+        name: nameToAdd,
         color,
         createdAt: serverTimestamp()
       });
-      await addLog("เพิ่มสมาชิก", newMemberName.trim(), "สมาชิก");
-      notify(`เพิ่ม ${newMemberName.trim()} เข้าทีมแล้ว`);
-      setNewMemberName("");
-      setShowMemberForm(false);
+      // Add to local state immediately for instant visual update
+      setMemberList((prev) => {
+        if (prev.some((p) => p.name.toLowerCase() === nameToAdd.toLowerCase())) return prev;
+        return [...prev, { id: "p_" + Date.now(), name: nameToAdd, color }];
+      });
+      await addLog("เพิ่มสมาชิก", nameToAdd, "สมาชิก");
+      notify(`เพิ่ม "${nameToAdd}" เข้าทีมเรียบร้อยแล้ว`);
     } catch (err: any) {
       alert("เพิ่มสมาชิกไม่สำเร็จ: " + err.message);
     }
@@ -1624,11 +1634,6 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
             {(page === "overview" || page === "payments") && role === "admin" && (
               <button className="primary-button" onClick={openAdd}>
                 {icons.plus} เพิ่มรอบดันเจี้ยน
-              </button>
-            )}
-            {page === "members" && role === "admin" && (
-              <button className="primary-button" onClick={() => setShowMemberForm(true)}>
-                {icons.plus} เพิ่มสมาชิก
               </button>
             )}
           </div>
