@@ -164,8 +164,9 @@ function isPlayerMatch(player: Player, identifier: string): boolean {
 }
 
 // Auto-expand a tier whose label is a floor range (e.g. "1-5", "เหมา 1-5") into individual floor tiers.
-// Each floor gets price = floor(totalPrice / count); remainder added to last floor.
-function expandTiersForSplit(tiers: DungeonTier[]): DungeonTier[] {
+// If allDiffTiers is provided and contains individual definitions for those floors (e.g. floors 1-4 = 200, 5 = 300),
+// it preserves their exact price proportion!
+function expandTiersForSplit(tiers: DungeonTier[], allDiffTiers?: DungeonTier[]): DungeonTier[] {
   const result: DungeonTier[] = [];
   for (const tier of tiers) {
     const match = tier.label.match(/(\d+)\s*-\s*(\d+)/);
@@ -174,6 +175,27 @@ function expandTiersForSplit(tiers: DungeonTier[]): DungeonTier[] {
       const end = parseInt(match[2], 10);
       if (end > start && end - start < 30) {
         const count = end - start + 1;
+        const matchingFloors = allDiffTiers
+          ? Array.from({ length: count }, (_, i) => String(start + i)).map((lbl) =>
+              allDiffTiers.find((t) => t.label === lbl)
+            )
+          : [];
+        const hasAllDefined = matchingFloors.length > 0 && matchingFloors.every((f) => f !== undefined);
+
+        if (hasAllDefined) {
+          const sumExisting = matchingFloors.reduce((s, f) => s + (f?.price || 0), 0);
+          const ratio = sumExisting > 0 && tier.price > 0 ? tier.price / sumExisting : 1;
+          for (const f of matchingFloors) {
+            if (f) {
+              result.push({
+                label: f.label,
+                price: Math.round(f.price * ratio),
+              });
+            }
+          }
+          continue;
+        }
+
         const basePrice = Math.floor(tier.price / count);
         const remainder = tier.price - basePrice * count;
         for (let i = 0; i < count; i++) {
@@ -1057,7 +1079,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
 
     if (isSplitCarry) {
       // Expand range tiers (e.g. "เหมา 1-5") into individual floor tiers for per-floor assignment
-      const tiersForSplit = expandTiersForSplit(selectedTiers);
+      const tiersForSplit = expandTiersForSplit(selectedTiers, selectedDiff?.tiers);
       for (const t of tiersForSplit) {
         const assigned = tierPlayerMap[t.label] || [];
         if (assigned.length === 0) {
@@ -2302,7 +2324,7 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
 
                   {/* Banner showing current mode */}
                   {(() => {
-                    const expandedCount = expandTiersForSplit(selectedTiers).length;
+                    const expandedCount = expandTiersForSplit(selectedTiers, selectedDiff?.tiers).length;
                     return (
                       <div style={{
                         fontSize: "11px", fontWeight: 700, padding: "5px 10px", borderRadius: "5px", marginBottom: "10px",
@@ -2354,29 +2376,100 @@ function Dashboard({ role, username, onLogout }: { role: Role; username: string;
                           );
                         })}
                       </div>
-                      {selectedPlayers.length > 0 && selectedTiers.length > 0 && (
-                        <div className="live-wage-preview">
-                          <strong>💡 ประมาณการ (ราคาฐาน ก่อนใส่ยอดจริง)</strong>
-                          <div className="live-wage-list">
-                            {selectedPlayers.map((pid) => {
-                              const p = memberList.find((m) => m.id === pid);
-                              const baseSum = selectedTiers.reduce((s, t) => s + t.price, 0);
-                              const perPerson = (baseSum * (1 - commissionRate / 100)) / selectedPlayers.length;
-                              return (
-                                <div key={pid} className="live-wage-item">
-                                  <span>{p?.name || pid}</span>
-                                  <b>฿{Math.round(perPerson).toLocaleString()}</b>
+                      {selectedPlayers.length > 0 && selectedTiers.length > 0 && (() => {
+                        const breakdownFloors = expandTiersForSplit(selectedTiers, selectedDiff?.tiers);
+                        const comMult = 1 - commissionRate / 100;
+                        const baseSum = selectedTiers.reduce((s, t) => s + t.price, 0);
+                        const totalPerPerson = (baseSum * comMult) / selectedPlayers.length;
+
+                        return (
+                          <div className="live-wage-preview">
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
+                              <strong style={{ margin: 0, fontSize: "13px" }}>💡 ประมาณการ (ราคาฐาน ก่อนใส่ยอดจริง)</strong>
+                              <span style={{ fontSize: "11px", color: "#166534", fontWeight: 600 }}>
+                                หักคอม {commissionRate}% · หาร {selectedPlayers.length} คน
+                              </span>
+                            </div>
+
+                            {/* รายละเอียดแต่ละชั้น: แต่ละชั้นได้คนละกี่บาท */}
+                            {breakdownFloors.length > 0 && (
+                              <div style={{
+                                margin: "6px 0 10px",
+                                padding: "8px 10px",
+                                background: "#ffffff",
+                                borderRadius: "6px",
+                                border: "1px solid #bbf7d0"
+                              }}>
+                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#166534", marginBottom: "6px" }}>
+                                  📋 รายได้ต่อคน แยกตามแต่ละชั้น:
                                 </div>
-                              );
-                            })}
+                                <div style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                                  gap: "6px"
+                                }}>
+                                  {breakdownFloors.map((fl) => {
+                                    const floorWagePerPerson = Math.round((fl.price * comMult) / selectedPlayers.length);
+                                    return (
+                                      <div
+                                        key={fl.label}
+                                        style={{
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                          alignItems: "center",
+                                          padding: "5px 8px",
+                                          background: "#f0fdf4",
+                                          borderRadius: "4px",
+                                          fontSize: "11px"
+                                        }}
+                                      >
+                                        <span style={{ color: "#374151" }}>
+                                          ชั้น {fl.label} <small style={{ color: "#6b7280" }}>(฿{fl.price})</small>
+                                        </span>
+                                        <b style={{ color: "#15803d", marginLeft: "4px" }}>
+                                          ฿{floorWagePerPerson.toLocaleString()}
+                                        </b>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div style={{
+                                  marginTop: "6px",
+                                  paddingTop: "6px",
+                                  borderTop: "1px dashed #bbf7d0",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  fontSize: "12px",
+                                  fontWeight: 700,
+                                  color: "#14532d"
+                                }}>
+                                  <span>รวมทุกชั้นได้คนละ:</span>
+                                  <span style={{ color: "#15803d" }}>
+                                    ฿{Math.round(totalPerPerson).toLocaleString()} / คน
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="live-wage-list">
+                              {selectedPlayers.map((pid) => {
+                                const p = memberList.find((m) => m.id === pid);
+                                return (
+                                  <div key={pid} className="live-wage-item">
+                                    <span>{p?.name || pid}</span>
+                                    <b>฿{Math.round(totalPerPerson).toLocaleString()}</b>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div>
                       {(() => {
-                        const expandedTiers = expandTiersForSplit(selectedTiers);
+                        const expandedTiers = expandTiersForSplit(selectedTiers, selectedDiff?.tiers);
                         return expandedTiers.map((tier) => {
                           const assigned = tierPlayerMap[tier.label] || [];
                           const tierWage = assigned.length > 0
