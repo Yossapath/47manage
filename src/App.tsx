@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import logoUrl from "./assets/logo.png";
 import { db } from "./firebase";
 import {
   collection,
@@ -447,22 +448,18 @@ function AdminAuthModal({
           ×
         </button>
         <div style={{ textAlign: "center", marginBottom: "16px" }}>
-          <div
+          <img
+            src={logoUrl}
+            alt="47Ravenge Logo"
             style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "50%",
-              background: "#edf5fd",
-              color: "#176bca",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "20px",
+              width: "52px",
+              height: "52px",
+              borderRadius: "12px",
               margin: "0 auto 10px auto",
+              display: "block",
+              boxShadow: "0 4px 14px rgba(23, 107, 202, 0.25)"
             }}
-          >
-            {icons.lock}
-          </div>
+          />
           <span className="eyebrow" style={{ color: "#176bca" }}>เฉพาะผู้ดูแลระบบ (Admin Only)</span>
           <h2 style={{ margin: "4px 0 6px 0", fontSize: "20px" }}>
             {view === "login" ? "เข้าสู่ระบบ Admin" : "สมัครบัญชี Admin ใหม่"}
@@ -1748,7 +1745,7 @@ function Dashboard({
       {/* ======================== SIDEBAR ======================== */}
       <aside className="sidebar">
         <div className="side-brand">
-          <div className="brand-mark mini"><span>47</span></div>
+          <img src={logoUrl} alt="47Ravenge Logo" className="brand-logo-img" />
           {sidebarOpen && <div><strong>47RAVENGE</strong><small>Reward Management</small></div>}
         </div>
 
