@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "revenge-b80cd",
     "public": ".",
     "ignore": [
       "firebase.json",
