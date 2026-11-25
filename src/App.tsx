@@ -723,7 +723,7 @@ function PlayerDetailModal({
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="modal" style={{ maxHeight: "88vh", overflowY: "auto" }} onMouseDown={(e) => e.stopPropagation()}>
         <button type="button" className="modal-close" onClick={onClose}>×</button>
         <span className="eyebrow">รายละเอียดการลงดันเจี้ยน</span>
         <h2 style={{ fontSize: "18px", margin: "4px 0 2px" }}>
@@ -802,48 +802,50 @@ function PlayerDetailModal({
         )}
 
         {/* Per-player breakdown */}
-        <strong style={{ fontSize: "13px", display: "block", marginBottom: "10px" }}>
-          รายรับสุทธิของทีมแบก ({row.players.length} คน)
-        </strong>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto" }}>
-          {row.players.map((pid, idx) => {
-            const p = memberList.find((m) => m.id === pid || isPlayerMatch(m, pid));
-            const playerWage = getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount, memberList);
-            const playedTiers = (row.segments || [])
-              .filter((s) => isPlayerInList(s.players, pid, memberList))
-              .map((s) => isMayaRow ? s.tierLabel : `ชั้น ${s.tierLabel.replace(/^ชั้น\s*/i, "")}`);
-            return (
-              <div
-                key={pid + idx}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "10px 14px",
-                  background: "#f9fbfd",
-                  borderRadius: "8px",
-                  border: "1px solid #e8edf3"
-                }}
-              >
-                <PlayerAvatar player={p} />
-                <div style={{ flex: 1 }}>
-                  <strong style={{ fontSize: "13px" }}>{p?.name || pid}</strong>
-                  <small style={{ display: "block", color: "#888", fontSize: "11px" }}>
-                    {row.segments && row.segments.length > 0
-                      ? `ลง: ${playedTiers.join(", ") || "-"}`
-                      : "ทีมแบก"}
-                  </small>
+        <div style={{ marginBottom: "16px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "12px" }}>
+          <strong style={{ fontSize: "13px", display: "block", color: "#334155", marginBottom: "8px" }}>
+            รายรับสุทธิของทีมแบก ({row.players.length} คน)
+          </strong>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {row.players.map((pid, idx) => {
+              const p = memberList.find((m) => m.id === pid || isPlayerMatch(m, pid));
+              const playerWage = getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount, memberList);
+              const playedTiers = (row.segments || [])
+                .filter((s) => isPlayerInList(s.players, pid, memberList))
+                .map((s) => isMayaRow ? s.tierLabel : `ชั้น ${s.tierLabel.replace(/^ชั้น\s*/i, "")}`);
+              return (
+                <div
+                  key={pid + idx}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "10px 14px",
+                    background: "#ffffff",
+                    borderRadius: "6px",
+                    border: "1px solid #e2e8f0"
+                  }}
+                >
+                  <PlayerAvatar player={p} />
+                  <div style={{ flex: 1 }}>
+                    <strong style={{ fontSize: "13px" }}>{p?.name || pid}</strong>
+                    <small style={{ display: "block", color: "#888", fontSize: "11px" }}>
+                      {row.segments && row.segments.length > 0
+                        ? `ลง: ${playedTiers.join(", ") || "-"}`
+                        : "ทีมแบก"}
+                    </small>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <strong style={{ fontSize: "15px", color: "#27ae60" }}>฿{formatMoney(playerWage)}</strong>
+                    <small style={{ display: "block", color: "#aaa", fontSize: "10px" }}>สุทธิหลังหักคอม</small>
+                  </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <strong style={{ fontSize: "15px", color: "#27ae60" }}>฿{formatMoney(playerWage)}</strong>
-                  <small style={{ display: "block", color: "#aaa", fontSize: "10px" }}>สุทธิหลังหักคอม</small>
-                </div>
-              </div>
-            );
-          })}
-          {row.players.length === 0 && (
-            <p style={{ color: "#aaa", fontSize: "12px", textAlign: "center", padding: "20px" }}>ไม่มีข้อมูลทีมแบก</p>
-          )}
+              );
+            })}
+            {row.players.length === 0 && (
+              <p style={{ color: "#aaa", fontSize: "12px", textAlign: "center", padding: "16px" }}>ไม่มีข้อมูลทีมแบก</p>
+            )}
+          </div>
         </div>
 
         {/* Slip preview (contained, non-overflowing) */}
@@ -1831,7 +1833,7 @@ function Dashboard({
         </td>
         <td className="payout">
           {isSplit ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "2px" }}>
               <span style={{ fontSize: "12px", color: "#166534", fontWeight: 700 }}>
                 ตามชั้น
               </span>
