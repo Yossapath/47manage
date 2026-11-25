@@ -96,33 +96,33 @@ const DEFAULT_DUNGEON_TEMPLATES: DungeonTemplate[] = [
       {
         name: "Nightmare",
         tiers: [
-          { label: "1", price: 150 },
-          { label: "2", price: 150 },
-          { label: "3", price: 150 },
-          { label: "4", price: 150 },
-          { label: "5", price: 200 },
-          { label: "เหมา 1-5", price: 600 },
+          { label: "1", price: 0 },
+          { label: "2", price: 0 },
+          { label: "3", price: 0 },
+          { label: "4", price: 0 },
+          { label: "5", price: 0 },
+          { label: "เหมา 1-5", price: 0 },
         ],
       },
       {
         name: "Hard",
         tiers: [
-          { label: "1", price: 30 },
-          { label: "2", price: 30 },
-          { label: "3", price: 30 },
-          { label: "4", price: 30 },
-          { label: "5", price: 30 },
+          { label: "1", price: 0 },
+          { label: "2", price: 0 },
+          { label: "3", price: 0 },
+          { label: "4", price: 0 },
+          { label: "5", price: 0 },
         ],
       },
       {
         name: "Hell",
         tiers: [
-          { label: "1", price: 400 },
-          { label: "2", price: 400 },
-          { label: "3", price: 400 },
-          { label: "4", price: 400 },
-          { label: "5", price: 500 },
-          { label: "เหมา 1-5", price: 1800 },
+          { label: "1", price: 0 },
+          { label: "2", price: 0 },
+          { label: "3", price: 0 },
+          { label: "4", price: 0 },
+          { label: "5", price: 0 },
+          { label: "เหมา 1-5", price: 0 },
         ],
       },
     ],
@@ -133,7 +133,7 @@ const DEFAULT_DUNGEON_TEMPLATES: DungeonTemplate[] = [
     difficulties: [
       {
         name: "ระดับเดียว",
-        tiers: [{ label: "เต็มรอบ", price: 300 }],
+        tiers: [{ label: "เต็มรอบ", price: 0 }],
       },
     ],
   },
@@ -266,6 +266,22 @@ function isPlayerInList(players: string[], playerId: string, memberList?: Player
   return players.some((x) => x === pObj.id || isPlayerMatch(pObj, x));
 }
 
+function isRowActuallySplit(row: PaymentRow): boolean {
+  if (row.splitCarry === true) return true;
+  if (row.splitCarry === false) return false;
+  // Fallback for legacy rows that lack the splitCarry boolean:
+  if (row.segments && row.segments.length > 1) {
+    const firstPlayers = (row.segments[0].players || []).slice().sort().join(",");
+    for (let i = 1; i < row.segments.length; i++) {
+      const segPlayers = (row.segments[i].players || []).slice().sort().join(",");
+      if (segPlayers !== firstPlayers) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Calculate the precise wage for a specific player in a given run
 // Supports proportional discount scaling: if customer pays less than base tiers sum,
 // each tier is discounted by that exact percentage before calculating per-player wages!
@@ -277,7 +293,7 @@ function getPlayerWageForRun(
   memberList?: Player[]
 ): number {
   const comMult = 1 - commissionRate / 100;
-  if (row.segments && row.segments.length > 0) {
+  if (isRowActuallySplit(row) && row.segments && row.segments.length > 0) {
     const baseSum = row.segments.reduce((sum, seg) => sum + (Number(seg.price) || 0), 0);
     // If sale amount is lower than baseSum (discount), scale each tier proportionally!
     const scale = (baseSum > 0 && row.sale > 0) ? (row.sale / baseSum) : 1;
@@ -770,8 +786,8 @@ function PlayerDetailModal({
           </div>
         )}
 
-        {/* Multi-Tier breakdown if exists */}
-        {row.segments && row.segments.length > 0 && (
+        {/* Multi-Tier breakdown if exists and is split */}
+        {isRowActuallySplit(row) && row.segments && row.segments.length > 0 && (
           <div style={{ marginBottom: "16px", background: "#f4f8fd", border: "1px solid #c9e0f8", borderRadius: "8px", padding: "12px" }}>
             <strong style={{ fontSize: "13px", display: "block", color: "#176bca", marginBottom: "8px" }}>
               การแบ่งช่วงและคนลง (Multi-Tier Breakdown)
@@ -830,7 +846,7 @@ function PlayerDetailModal({
                   <div style={{ flex: 1 }}>
                     <strong style={{ fontSize: "13px" }}>{p?.name || pid}</strong>
                     <small style={{ display: "block", color: "#888", fontSize: "11px" }}>
-                      {row.segments && row.segments.length > 0
+                      {isRowActuallySplit(row) && row.segments && row.segments.length > 0
                         ? `ลง: ${playedTiers.join(", ") || "-"}`
                         : "ทีมแบก"}
                     </small>
@@ -1272,7 +1288,7 @@ function Dashboard({
       })
       .filter((p) => p.grand > 0 || p.rounds > 0)
       .sort((a, b) => b.grand - a.grand);
-  }, [rows, allActivePlayers, commissionRate, defaultCarryCount]);
+  }, [rows, allActivePlayers, commissionRate, defaultCarryCount, memberList]);
 
   const pageTitles: Record<Page, [string, string]> = {
     overview: ["ภาพรวมค่าตอบแทน", "ติดตามรายได้ ส่วนแบ่งของทีม และสถิติล่าสุด"],
@@ -1328,16 +1344,16 @@ function Dashboard({
     setFormTime(row.time || getNowTimeStr());
     setFormCommissionTo(row.commissionTo || "-");
 
-    // Check if was split: either flag is true, or segments have differing player lists
+    // Check if was split using robust isRowActuallySplit
     const hasSegments = Array.isArray(row.segments) && row.segments.length > 0;
-    const wasSplit = row.splitCarry === true || (hasSegments && (row.segments?.length ?? 0) > 1);
+    const wasSplit = isRowActuallySplit(row);
 
     if (hasSegments && row.segments) {
-      // Reconstitute selected tiers with base template prices if found, so scaling works correctly
-      const tiers: DungeonTier[] = row.segments.map((s) => {
-        const found = diff?.tiers.find((t) => t.label === s.tierLabel);
-        return { label: s.tierLabel, price: found?.price || s.price };
-      });
+      // Reconstitute selected tiers with custom prices from saved segments
+      const tiers: DungeonTier[] = row.segments.map((s) => ({
+        label: s.tierLabel,
+        price: Number(s.price) || 0,
+      }));
       setSelectedTiers(tiers);
       setIsSplitCarry(wasSplit);
 
@@ -1357,7 +1373,12 @@ function Dashboard({
       setTierPlayerMap({});
       setSelectedPlayers(row.players || []);
       const matchingTiers = matchTiersFromTierStr(row.tier, diff?.tiers || []);
-      setSelectedTiers(matchingTiers.length > 0 ? matchingTiers : diff?.tiers ? [...diff.tiers] : []);
+      const perFloor = matchingTiers.length > 0 ? Math.round(row.sale / matchingTiers.length) : 0;
+      setSelectedTiers(
+        matchingTiers.length > 0
+          ? matchingTiers.map((t) => ({ ...t, price: perFloor }))
+          : diff?.tiers ? diff.tiers.map((t) => ({ ...t, price: 0 })) : []
+      );
     }
     setEditRow(row);
   };
@@ -1707,7 +1728,7 @@ function Dashboard({
           ...t.difficulties,
           {
             name: newDiffName.trim(),
-            tiers: newTiers.filter((ti) => ti.label.trim()).map((ti) => ({ label: ti.label.trim(), price: ti.price })),
+            tiers: newTiers.filter((ti) => ti.label.trim()).map((ti) => ({ label: ti.label.trim(), price: 0 })),
           },
         ],
       };
@@ -1737,7 +1758,10 @@ function Dashboard({
         ...tmpl,
         difficulties: tmpl.difficulties.map((diff) => {
           if (`${templateId}_${diff.name}` !== editingDiffKey) return diff;
-          return { name: editDiffNameVal.trim() || diff.name, tiers: editDiffTiers.filter((t) => t.label && t.price > 0) };
+          return {
+            name: editDiffNameVal.trim() || diff.name,
+            tiers: editDiffTiers.filter((t) => t.label.trim()).map((t) => ({ label: t.label.trim(), price: 0 })),
+          };
         }),
       };
     });
@@ -1779,12 +1803,15 @@ function Dashboard({
 
   // Shared table row renderer
   const renderTableRow = (row: PaymentRow, showManage: boolean) => {
-    const isSplit = row.splitCarry === true || (Boolean(row.segments && row.segments.length > 0));
+    const isSplit = isRowActuallySplit(row);
     const carryCount = row.players.length || defaultCarryCount;
-    // Use proportional discount-aware wage (uses actual sale, not base tier price)
-    const perPlayer = row.players.length > 0
-      ? row.players.reduce((sum, pid) => sum + getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount, memberList), 0) / row.players.length
-      : (row.sale * (1 - commissionRate / 100)) / carryCount;
+    // In unified carry ("แบกพร้อมกัน"), divide total pool equally among all players
+    const equalWage = carryCount > 0 ? (row.sale * (1 - commissionRate / 100)) / carryCount : 0;
+    const perPlayer = isSplit
+      ? (row.players.length > 0
+          ? row.players.reduce((sum, pid) => sum + getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount, memberList), 0) / row.players.length
+          : equalWage)
+      : equalWage;
     const isMaya = Boolean(row.dungeon?.toLowerCase().includes("maya"));
     const cleanTier = isMaya ? row.tier.replace(/ชั้น\s*/gi, "") : row.tier;
     const diffLabel = [row.difficulty, cleanTier].filter(Boolean).join(" · ");
@@ -2626,21 +2653,14 @@ function Dashboard({
                                       style={{ display: "block", width: "100%", marginTop: "4px", height: "34px", border: "1px solid #dce4ec", borderRadius: "5px", padding: "0 10px", fontSize: "13px", boxSizing: "border-box" }}
                                     />
                                   </label>
-                                  <strong style={{ fontSize: "12px", display: "block", margin: "10px 0 6px" }}>Tiers และราคา</strong>
+                                  <strong style={{ fontSize: "12px", display: "block", margin: "10px 0 6px" }}>Tiers / ชั้น (เช่น 1, 2, 3 หรือ 1-5)</strong>
                                   {editDiffTiers.map((tier, idx) => (
                                     <div key={idx} className="tier-row">
                                       <input
                                         type="text"
-                                        placeholder="ชั้น (เช่น 1-3, 4-5, 1-5)"
+                                        placeholder="ชั้น (เช่น 1, 2, 3 หรือ 1-5)"
                                         value={tier.label}
                                         onChange={(e) => { const t = [...editDiffTiers]; t[idx] = { ...t[idx], label: e.target.value }; setEditDiffTiers(t); }}
-                                      />
-                                      <input
-                                        type="number"
-                                        placeholder="ราคา (฿)"
-                                        min={0}
-                                        value={tier.price || ""}
-                                        onChange={(e) => { const t = [...editDiffTiers]; t[idx] = { ...t[idx], price: Number(e.target.value) }; setEditDiffTiers(t); }}
                                       />
                                       <button type="button" onClick={() => setEditDiffTiers(editDiffTiers.filter((_, i) => i !== idx))} style={{ border: 0, background: "none", color: "#bbb", cursor: "pointer" }}>✕</button>
                                     </div>
@@ -2660,7 +2680,7 @@ function Dashboard({
                                       const isTmplMaya = tmpl.id.toLowerCase().includes("maya") || tmpl.name.toLowerCase().includes("maya");
                                       return (
                                         <span key={tier.label} className="diff-tier-chip">
-                                          {isTmplMaya ? "" : "ชั้น "}{tier.label.replace(/^ชั้น\s*/i, "")} · <strong>฿{tier.price.toLocaleString()}</strong>
+                                          {isTmplMaya ? "" : "ชั้น "}{tier.label.replace(/^ชั้น\s*/i, "")}
                                         </span>
                                       );
                                     })}
@@ -2698,21 +2718,14 @@ function Dashboard({
                               placeholder="เช่น Nightmare"
                             />
                           </label>
-                          <strong style={{ fontSize: "12px", display: "block", margin: "10px 0 6px" }}>Tiers และราคา (เพิ่มหลายแถวได้)</strong>
+                          <strong style={{ fontSize: "12px", display: "block", margin: "10px 0 6px" }}>Tiers / ชั้น (เพิ่มหลายแถวได้)</strong>
                           {newTiers.map((tier, idx) => (
                             <div key={idx} className="tier-row">
                               <input
                                 type="text"
-                                placeholder="ชั้น (เช่น 1-3, 4-5, 1-5)"
+                                placeholder="ชั้น (เช่น 1, 2, 3 หรือ 1-5)"
                                 value={tier.label}
                                 onChange={(e) => { const t = [...newTiers]; t[idx] = { ...t[idx], label: e.target.value }; setNewTiers(t); }}
-                              />
-                              <input
-                                type="number"
-                                placeholder="ราคา (฿)"
-                                min={0}
-                                value={tier.price || ""}
-                                onChange={(e) => { const t = [...newTiers]; t[idx] = { ...t[idx], price: Number(e.target.value) }; setNewTiers(t); }}
                               />
                               <button
                                 type="button"
@@ -3061,8 +3074,12 @@ function Dashboard({
                           // Pick individual floors, avoiding mixing bundle (e.g. เหมา 1-5) with 1, 2, 3, 4, 5
                           const nonRange = selectedDiff.tiers.filter((t) => !/\d+\s*-\s*\d+/.test(t.label));
                           const all = nonRange.length > 0 ? nonRange : [...selectedDiff.tiers];
-                          setSelectedTiers(all);
-                          setFormSaleOverride(all.reduce((s, t) => s + t.price, 0));
+                          const nextTiers = all.map((t) => {
+                            const existing = selectedTiers.find((st) => st.label === t.label);
+                            return { ...t, price: existing?.price || 0 };
+                          });
+                          setSelectedTiers(nextTiers);
+                          setFormSaleOverride(nextTiers.reduce((s, t) => s + (Number(t.price) || 0), 0));
                           setTierPlayerMap({});
                         }}>เหมาทุกชั้น</button>
                       )}
@@ -3077,17 +3094,21 @@ function Dashboard({
                     {selectedDiff.tiers.map((tier) => {
                       const isRange = /\d+\s*-\s*\d+/.test(tier.label);
                       const isSelected = selectedTiers.some((t) => t.label === tier.label);
+                      const currentSelected = selectedTiers.find((t) => t.label === tier.label);
                       return (
                         <button
                           key={tier.label}
                           type="button"
                           className={`tier-chip-btn${isSelected ? " selected" : ""}`}
                           onClick={() => {
+                            const existing = selectedTiers.find((t) => t.label === tier.label);
+                            const tierObj: DungeonTier = existing || { label: tier.label, price: 0 };
+
                             if (isMaya) {
                               // Maya can ONLY select ONE tier at a time!
-                              const next = isSelected ? [] : [tier];
+                              const next = isSelected ? [] : [tierObj];
                               setSelectedTiers(next);
-                              setFormSaleOverride(next.reduce((s, t) => s + t.price, 0));
+                              setFormSaleOverride(next.reduce((s, t) => s + (Number(t.price) || 0), 0));
                               setTierPlayerMap({});
                               return;
                             }
@@ -3098,17 +3119,17 @@ function Dashboard({
                               next = selectedTiers.filter((t) => t.label !== tier.label);
                             } else if (isRange) {
                               // Range tier selected → clear all others (mutually exclusive)
-                              next = [tier];
+                              next = [tierObj];
                             } else {
                               // Individual tier selected → remove any range tiers, add this one
                               const noRanges = selectedTiers.filter((t) => !/\d+\s*-\s*\d+/.test(t.label));
-                              next = [...noRanges, tier].sort(
+                              next = [...noRanges, tierObj].sort(
                                 (a, b) => selectedDiff.tiers.findIndex((x) => x.label === a.label)
                                         - selectedDiff.tiers.findIndex((x) => x.label === b.label)
                               );
                             }
                             setSelectedTiers(next);
-                            setFormSaleOverride(next.reduce((s, t) => s + t.price, 0));
+                            setFormSaleOverride(next.reduce((s, t) => s + (Number(t.price) || 0), 0));
                             // Clean up tierPlayerMap for removed tiers
                             const newMap = { ...tierPlayerMap };
                             if (isSelected) delete newMap[tier.label];
@@ -3118,14 +3139,78 @@ function Dashboard({
                           <span className="tier-chip-label">
                             {isMaya ? tier.label.replace(/^ชั้น\s*/i, "") : `ชั้น ${tier.label.replace(/^ชั้น\s*/i, "")}`}
                           </span>
-                          <span className="tier-chip-price">฿{tier.price.toLocaleString()}/คน</span>
+                          {currentSelected && currentSelected.price > 0 && (
+                            <span className="tier-chip-price">฿{currentSelected.price.toLocaleString()}</span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
+                  {/* Per-Floor Price Input Section */}
                   {selectedTiers.length > 0 && (
-                    <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
-                      ราคาฐานรวม: <strong style={{ color: "#176bca" }}>฿{selectedTiers.reduce((s, t) => s + t.price, 0).toLocaleString()}</strong>
+                    <div style={{
+                      margin: "12px 0 16px",
+                      padding: "12px 14px",
+                      background: "#f8fafc",
+                      borderRadius: "8px",
+                      border: "1px solid #cbd5e1"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <strong style={{ fontSize: "12px", color: "#1e293b", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>💰</span> ระบุราคาต่อชั้น (บาท)
+                        </strong>
+                        <span style={{ fontSize: "12px", color: "#64748b" }}>
+                          รวมราคาฐาน: <strong style={{ color: "#16a34a", fontSize: "13px" }}>฿{selectedTiers.reduce((s, t) => s + (Number(t.price) || 0), 0).toLocaleString()}</strong>
+                        </span>
+                      </div>
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: selectedTiers.length > 4 ? "repeat(auto-fill, minmax(130px, 1fr))" : `repeat(${selectedTiers.length}, 1fr)`,
+                        gap: "8px"
+                      }}>
+                        {selectedTiers.map((t, idx) => (
+                          <div
+                            key={t.label}
+                            style={{
+                              background: "#ffffff",
+                              padding: "8px 10px",
+                              borderRadius: "6px",
+                              border: "1px solid #dce4ec"
+                            }}
+                          >
+                            <label style={{ fontSize: "11px", fontWeight: 700, color: "#475569", display: "block", marginBottom: "4px" }}>
+                              {isMaya ? t.label : `ชั้น ${t.label.replace(/^ชั้น\s*/i, "")}`}
+                            </label>
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <span style={{ fontSize: "12px", color: "#94a3b8" }}>฿</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={t.price || ""}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  const updated = [...selectedTiers];
+                                  updated[idx] = { ...updated[idx], price: val };
+                                  setSelectedTiers(updated);
+                                  const total = updated.reduce((s, item) => s + (Number(item.price) || 0), 0);
+                                  setFormSaleOverride(total);
+                                }}
+                                style={{
+                                  width: "100%",
+                                  height: "30px",
+                                  padding: "0 6px",
+                                  fontSize: "13px",
+                                  fontWeight: 600,
+                                  border: "1px solid #cbd5e1",
+                                  borderRadius: "4px",
+                                  boxSizing: "border-box"
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -3424,14 +3509,47 @@ function Dashboard({
                           return (
                             <div key={tier.label} className="tier-assign-card">
                               <div className="tier-assign-head">
-                                <strong>
-                                  {isMaya ? "" : "ชั้น "}{tier.label.replace(/^ชั้น\s*/i, "")} · ฿{formatMoney(tierPriceScaled)}/คน
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                  <strong>
+                                    {isMaya ? "" : "ชั้น "}{tier.label.replace(/^ชั้น\s*/i, "")}
+                                  </strong>
+                                  <div style={{ display: "inline-flex", alignItems: "center", gap: "3px", background: "#f8fafc", padding: "2px 6px", borderRadius: "4px", border: "1px solid #cbd5e1" }}>
+                                    <span style={{ fontSize: "11px", color: "#64748b" }}>฿</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={tier.price || ""}
+                                      placeholder="0"
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value) || 0;
+                                        let updated: DungeonTier[];
+                                        if (selectedTiers.some((st) => st.label === tier.label)) {
+                                          updated = selectedTiers.map((st) => st.label === tier.label ? { ...st, price: val } : st);
+                                        } else {
+                                          updated = expandedTiers.map((et) => et.label === tier.label ? { ...et, price: val } : { ...et });
+                                        }
+                                        setSelectedTiers(updated);
+                                        const total = updated.reduce((s, t) => s + (Number(t.price) || 0), 0);
+                                        setFormSaleOverride(total);
+                                      }}
+                                      style={{
+                                        width: "68px",
+                                        height: "22px",
+                                        padding: "0 4px",
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        border: "1px solid #cbd5e1",
+                                        borderRadius: "3px",
+                                        boxSizing: "border-box"
+                                      }}
+                                    />
+                                  </div>
                                   {scale !== 1 && (
-                                    <small style={{ color: "#64748b", fontWeight: 400, marginLeft: "4px" }}>
-                                      (ฐาน ฿{tier.price})
+                                    <small style={{ color: "#64748b", fontWeight: 400 }}>
+                                      (ปรับตามยอดจริง ฿{formatMoney(tierPriceScaled)})
                                     </small>
                                   )}
-                                </strong>
+                                </div>
                                 <small style={{ color: assigned.length === defaultCarryCount ? "#22c55e" : assigned.length > 0 ? "#176bca" : "#f59e0b", fontWeight: 700 }}>
                                   {assigned.length > 0
                                     ? `${assigned.length}/${defaultCarryCount} คน → คนละ ฿${formatMoney(tierWage)}`

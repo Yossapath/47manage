@@ -344,7 +344,7 @@ tfoot td { font-size: 12px; padding: 12px 10px; border-top: 2px solid #d4dce5; b
 .dungeon-add-panel h4 { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: #172033; }
 .tier-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #edf3f9; }
 .tier-row:last-child { border: none; }
-.tier-row input[type="text"] { flex: 2; height: 36px; border: 1px solid #dce4ec; border-radius: 5px; padding: 0 10px; font-size: 13px; }
+.tier-row input[type="text"] { flex: 1; height: 36px; border: 1px solid #dce4ec; border-radius: 5px; padding: 0 10px; font-size: 13px; }
 .tier-row input[type="number"] { flex: 1; height: 36px; border: 1px solid #dce4ec; border-radius: 5px; padding: 0 10px; font-size: 13px; }
 
 /* Difficulty badge colors */
