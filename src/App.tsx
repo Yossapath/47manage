@@ -225,6 +225,47 @@ function expandTiersForSplit(tiers: DungeonTier[], allDiffTiers?: DungeonTier[])
   return result;
 }
 
+// Parse saved tier label (e.g. "เหมา (ชั้น 1-5)", "ชั้น 1-5", "ชั้น 1, ชั้น 2") back to matching DungeonTier[]
+function matchTiersFromTierStr(tierStr: string, allTiers: DungeonTier[]): DungeonTier[] {
+  if (!tierStr || !allTiers || allTiers.length === 0) return [];
+
+  // 1. Direct label match
+  const exact = allTiers.filter((t) => tierStr.trim() === t.label.trim());
+  if (exact.length > 0) return exact;
+
+  // 2. Check for floor range in tierStr, e.g. "1-5", "เหมา (ชั้น 1-5)"
+  const rangeMatch = tierStr.match(/(\d+)\s*-\s*(\d+)/);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1], 10);
+    const end = parseInt(rangeMatch[2], 10);
+    if (!isNaN(start) && !isNaN(end) && end >= start) {
+      const inRange = allTiers.filter((t) => {
+        const num = parseInt(t.label.replace(/\D/g, ""), 10);
+        return !isNaN(num) && num >= start && num <= end;
+      });
+      if (inRange.length > 0) return inRange;
+    }
+  }
+
+  // 3. Match individual tiers by number or label (e.g. "ชั้น 1, ชั้น 5")
+  const individualMatches = allTiers.filter((t) => {
+    const cleanLabel = t.label.replace(/^ชั้น\s*/i, "").trim();
+    const regex = new RegExp(`(^|[^\\d])${cleanLabel.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}([^\\d]|$)`);
+    return regex.test(tierStr) || tierStr.includes(t.label);
+  });
+  if (individualMatches.length > 0) return individualMatches;
+
+  return allTiers.length > 0 ? [allTiers[0]] : [];
+}
+
+function isPlayerInList(players: string[], playerId: string, memberList?: Player[]): boolean {
+  if (players.includes(playerId)) return true;
+  if (!memberList) return false;
+  const pObj = memberList.find((m) => m.id === playerId || isPlayerMatch(m, playerId));
+  if (!pObj) return false;
+  return players.some((x) => x === pObj.id || isPlayerMatch(pObj, x));
+}
+
 // Calculate the precise wage for a specific player in a given run
 // Supports proportional discount scaling: if customer pays less than base tiers sum,
 // each tier is discounted by that exact percentage before calculating per-player wages!
@@ -232,7 +273,8 @@ function getPlayerWageForRun(
   row: PaymentRow,
   playerId: string,
   commissionRate: number,
-  defaultCarryCount: number
+  defaultCarryCount: number,
+  memberList?: Player[]
 ): number {
   const comMult = 1 - commissionRate / 100;
   if (row.segments && row.segments.length > 0) {
@@ -242,7 +284,7 @@ function getPlayerWageForRun(
 
     let wage = 0;
     for (const seg of row.segments) {
-      if (seg.players.includes(playerId)) {
+      if (isPlayerInList(seg.players, playerId, memberList)) {
         const count = seg.players.length || 1;
         const effectiveTierPrice = (Number(seg.price) || 0) * scale;
         wage += (effectiveTierPrice * comMult) / count;
@@ -250,11 +292,22 @@ function getPlayerWageForRun(
     }
     return wage;
   }
-  if (row.players.includes(playerId)) {
+  if (isPlayerInList(row.players, playerId, memberList)) {
     const count = row.players.length || defaultCarryCount;
     return (row.sale * comMult) / count;
   }
   return 0;
+}
+
+function getNowDateStr(): string {
+  const now = new Date();
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${now.getDate()}-${months[now.getMonth()]}`;
+}
+
+function getNowTimeStr(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 const DEFAULT_PLAYERS: Player[] = [
@@ -755,7 +808,10 @@ function PlayerDetailModal({
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto" }}>
           {row.players.map((pid, idx) => {
             const p = memberList.find((m) => m.id === pid || isPlayerMatch(m, pid));
-            const playerWage = getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount);
+            const playerWage = getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount, memberList);
+            const playedTiers = (row.segments || [])
+              .filter((s) => isPlayerInList(s.players, pid, memberList))
+              .map((s) => isMayaRow ? s.tierLabel : `ชั้น ${s.tierLabel.replace(/^ชั้น\s*/i, "")}`);
             return (
               <div
                 key={pid + idx}
@@ -774,7 +830,7 @@ function PlayerDetailModal({
                   <strong style={{ fontSize: "13px" }}>{p?.name || pid}</strong>
                   <small style={{ display: "block", color: "#888", fontSize: "11px" }}>
                     {row.segments && row.segments.length > 0
-                      ? `ลงชั้น: ${row.segments.filter((s) => s.players.includes(pid)).map((s) => s.tierLabel).join(", ") || "-"}`
+                      ? `ลง: ${playedTiers.join(", ") || "-"}`
                       : "ทีมแบก"}
                   </small>
                 </div>
@@ -848,8 +904,8 @@ function Dashboard({
   // Payment form: multi-tier selection & split-carry assignments
   const [formDungeonId, setFormDungeonId] = useState<string>("");
   const [formDiffName, setFormDiffName] = useState<string>("");
-  const [formDate, setFormDate] = useState<string>("");
-  const [formTime, setFormTime] = useState<string>("");
+  const [formDate, setFormDate] = useState<string>(getNowDateStr);
+  const [formTime, setFormTime] = useState<string>(getNowTimeStr);
   const [selectedTiers, setSelectedTiers] = useState<DungeonTier[]>([]);
   const [isSplitCarry, setIsSplitCarry] = useState<boolean>(false);
   const [tierPlayerMap, setTierPlayerMap] = useState<Record<string, string[]>>({});
@@ -925,6 +981,8 @@ function Dashboard({
           detail: val.detail || "",
           commissionTo: val.commissionTo || val.saleBy || "-",
           players: Array.isArray(val.players) ? val.players : (Array.isArray(val.carryPlayers) ? val.carryPlayers : []),
+          segments: Array.isArray(val.segments) ? val.segments : undefined,
+          splitCarry: val.splitCarry === true,
           slip: val.slip || val.slipUrl || undefined,
           createdAt: val.createdAt
         });
@@ -1203,7 +1261,7 @@ function Dashboard({
     return allActivePlayers
       .map((p) => {
         const pRuns = rows.filter((r) => r.players.includes(p.id) || r.players.some((x) => isPlayerMatch(p, x)));
-        const wage = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount), 0);
+        const wage = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount, memberList), 0);
         const com = rows
           .filter((r) => r.commissionTo && r.commissionTo !== "-" && isPlayerMatch(p, r.commissionTo))
           .reduce((sum, r) => sum + (r.sale * commissionRate) / 100, 0);
@@ -1240,13 +1298,9 @@ function Dashboard({
     setFormDiffName(firstDiff?.name || "");
     setFormCommissionTo("-");
 
-    // Current timestamp for date and time
-    const now = new Date();
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const dStr = `${now.getDate()}-${months[now.getMonth()]}`;
-    const tStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    setFormDate(dStr);
-    setFormTime(tStr);
+    // Fresh timestamp for date and time
+    setFormDate(getNowDateStr());
+    setFormTime(getNowTimeStr());
 
     // Start with no tiers selected — user picks manually
     setSelectedTiers([]);
@@ -1257,18 +1311,24 @@ function Dashboard({
   const openEdit = (row: PaymentRow) => {
     setCurrentSlipBase64(row.slip || "");
     const tmpl = dungeonTemplates.find((t) => t.name === row.dungeon) || dungeonTemplates[0];
+    const diff = tmpl?.difficulties.find((d) => d.name === row.difficulty) || tmpl?.difficulties[0];
     setFormDungeonId(tmpl?.id || "");
-    setFormDiffName(row.difficulty || "");
+    setFormDiffName(row.difficulty || diff?.name || "");
     setFormSaleOverride(row.sale);
-    setFormDate(row.date || "");
-    setFormTime(row.time || "");
+    setFormDate(row.date || getNowDateStr());
+    setFormTime(row.time || getNowTimeStr());
     setFormCommissionTo(row.commissionTo || "-");
 
-    // Use explicit splitCarry flag; fall back to old behaviour for legacy rows that lack the flag
-    const wasSplit = row.splitCarry === true;
+    // Check if was split: either flag is true, or segments have differing player lists
+    const hasSegments = Array.isArray(row.segments) && row.segments.length > 0;
+    const wasSplit = row.splitCarry === true || (hasSegments && (row.segments?.length ?? 0) > 1);
 
-    if (row.segments && row.segments.length > 0) {
-      const tiers: DungeonTier[] = row.segments.map((s) => ({ label: s.tierLabel, price: s.price }));
+    if (hasSegments && row.segments) {
+      // Reconstitute selected tiers with base template prices if found, so scaling works correctly
+      const tiers: DungeonTier[] = row.segments.map((s) => {
+        const found = diff?.tiers.find((t) => t.label === s.tierLabel);
+        return { label: s.tierLabel, price: found?.price || s.price };
+      });
       setSelectedTiers(tiers);
       setIsSplitCarry(wasSplit);
 
@@ -1287,8 +1347,7 @@ function Dashboard({
       setIsSplitCarry(false);
       setTierPlayerMap({});
       setSelectedPlayers(row.players || []);
-      const diff = tmpl?.difficulties.find((d) => d.name === row.difficulty) || tmpl?.difficulties[0];
-      const matchingTiers = diff?.tiers.filter((t) => row.tier.includes(t.label)) || [];
+      const matchingTiers = matchTiersFromTierStr(row.tier, diff?.tiers || []);
       setSelectedTiers(matchingTiers.length > 0 ? matchingTiers : diff?.tiers ? [...diff.tiers] : []);
     }
     setEditRow(row);
@@ -1330,8 +1389,8 @@ function Dashboard({
     const saleAmount = Number(data.get("sale")) || formSaleOverride || 0;
     const ctmName = String(data.get("ctm"));
     const detailText = String(data.get("detail"));
-    const dateVal = formDate || String(data.get("date")) || "";
-    const timeVal = formTime || String(data.get("time")) || "";
+    const dateVal = formDate || String(data.get("date") || "") || getNowDateStr();
+    const timeVal = formTime || String(data.get("time") || "") || getNowTimeStr();
     const commissionToVal = formCommissionTo || String(data.get("commissionTo") || "-");
 
     const tmpl = dungeonTemplates.find((t) => t.id === formDungeonId) || selectedTemplate;
@@ -1371,13 +1430,26 @@ function Dashboard({
       finalPlayers = [...selectedPlayers];
     }
 
-    const allDiffTiers = selectedDiff?.tiers || [];
-    const isAllSelected = allDiffTiers.length > 0 && selectedTiers.length === allDiffTiers.length;
-    const tierLbl = isMaya
-      ? selectedTiers.map((t) => t.label.replace(/^ชั้น\s*/i, "")).join(", ")
-      : isAllSelected
-      ? `เหมา (ชั้น ${selectedTiers[0]?.label}-${selectedTiers[selectedTiers.length - 1]?.label})`
-      : selectedTiers.map((t) => (t.label.startsWith("ชั้น") ? t.label : `ชั้น ${t.label}`)).join(", ");
+    let tierLbl = "";
+    if (isMaya) {
+      tierLbl = selectedTiers.map((t) => t.label.replace(/^ชั้น\s*/i, "")).join(", ");
+    } else {
+      const numericFloors = selectedTiers
+        .map((t) => parseInt(t.label.replace(/\D/g, ""), 10))
+        .filter((n) => !isNaN(n))
+        .sort((a, b) => a - b);
+      const isContiguous =
+        numericFloors.length > 1 &&
+        numericFloors.length === (numericFloors[numericFloors.length - 1] - numericFloors[0] + 1);
+
+      if (isContiguous) {
+        tierLbl = `ชั้น ${numericFloors[0]}-${numericFloors[numericFloors.length - 1]}`;
+      } else if (selectedTiers.length === 1 && /\d+\s*-\s*\d+/.test(selectedTiers[0].label)) {
+        tierLbl = selectedTiers[0].label;
+      } else {
+        tierLbl = selectedTiers.map((t) => (t.label.startsWith("ชั้น") ? t.label : `ชั้น ${t.label}`)).join(", ");
+      }
+    }
 
     const payload = {
       date: dateVal,
@@ -1690,10 +1762,11 @@ function Dashboard({
 
   // Shared table row renderer
   const renderTableRow = (row: PaymentRow, showManage: boolean) => {
+    const isSplit = row.splitCarry === true || (Boolean(row.segments && row.segments.length > 0));
     const carryCount = row.players.length || defaultCarryCount;
     // Use proportional discount-aware wage (uses actual sale, not base tier price)
     const perPlayer = row.players.length > 0
-      ? row.players.reduce((sum, pid) => sum + getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount), 0) / row.players.length
+      ? row.players.reduce((sum, pid) => sum + getPlayerWageForRun(row, pid, commissionRate, defaultCarryCount, memberList), 0) / row.players.length
       : (row.sale * (1 - commissionRate / 100)) / carryCount;
     const isMaya = Boolean(row.dungeon?.toLowerCase().includes("maya"));
     const cleanTier = isMaya ? row.tier.replace(/ชั้น\s*/gi, "") : row.tier;
@@ -1719,11 +1792,55 @@ function Dashboard({
           )}
         </td>
         <td className="players-cell">
-          <button className="player-names" onClick={() => setSelectedRow(row)}>
-            {row.players.map((id) => memberList.find((p) => p.id === id)?.name || id).join(", ") || "-"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <button className="player-names" onClick={() => setSelectedRow(row)}>
+              {row.players.map((id) => memberList.find((p) => p.id === id)?.name || id).join(", ") || "-"}
+            </button>
+            {isSplit && (
+              <span
+                style={{
+                  fontSize: "10px",
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  padding: "1px 5px",
+                  borderRadius: "4px",
+                  fontWeight: 700,
+                  border: "1px solid #fde68a",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                แยกชั้น
+              </span>
+            )}
+          </div>
         </td>
-        <td className="payout">฿{formatMoney(perPlayer)}</td>
+        <td className="payout">
+          {isSplit ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+              <span style={{ fontSize: "12px", color: "#166534", fontWeight: 700 }}>
+                ตามชั้น
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedRow(row)}
+                style={{
+                  fontSize: "10px",
+                  color: "#1d4ed8",
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: "4px",
+                  padding: "1px 6px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                ดูยอดรายคน
+              </button>
+            </div>
+          ) : (
+            `฿${formatMoney(perPlayer)}`
+          )}
+        </td>
         <td>
           {row.slip ? (
             <button type="button" onClick={() => setViewSlipUrl(row.slip!)} style={{ color: "#176bca", fontWeight: 700, fontSize: "12px", textDecoration: "underline" }}>
@@ -2265,17 +2382,26 @@ function Dashboard({
                   <strong>฿{total.toLocaleString()}</strong>
                 </div>
                 <div className="bar-chart">
-                  {memberList.slice(0, 7).map((p) => {
-                    const pRuns = rows.filter((r) => r.players.includes(p.id));
-                    const inc = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount), 0);
-                    const barH = total > 0 ? Math.max(20, Math.min(160, (inc / (total / 3)) * 140)) : 20;
-                    return (
-                      <div key={p.id}>
-                        <span style={{ height: `${barH}px`, background: p.color }}></span>
-                        <small>{p.name.slice(0, 5)}</small>
-                      </div>
-                    );
-                  })}
+                  {(() => {
+                    const sortedChartMembers = memberList
+                      .map((p) => {
+                        const pRuns = rows.filter((r) => r.players.includes(p.id) || r.players.some((x) => isPlayerMatch(p, x)));
+                        const inc = pRuns.reduce((sum, r) => sum + getPlayerWageForRun(r, p.id, commissionRate, defaultCarryCount, memberList), 0);
+                        return { ...p, inc };
+                      })
+                      .sort((a, b) => b.inc - a.inc)
+                      .slice(0, 7);
+
+                    return sortedChartMembers.map((p) => {
+                      const barH = total > 0 ? Math.max(20, Math.min(160, (p.inc / (total / 3)) * 140)) : 20;
+                      return (
+                        <div key={p.id} title={`${p.name}: ฿${formatMoney(p.inc)}`}>
+                          <span style={{ height: `${barH}px`, background: p.color }}></span>
+                          <small>{p.name.replace(/^K\./i, "").slice(0, 5)}</small>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </article>
 
@@ -2915,8 +3041,9 @@ function Dashboard({
                     <div style={{ display: "flex", gap: "6px" }}>
                       {!isMaya && (
                         <button type="button" className="tier-quick-btn" onClick={() => {
-                          // Select all tiers, replacing any partial selection
-                          const all = [...selectedDiff.tiers];
+                          // Pick individual floors, avoiding mixing bundle (e.g. เหมา 1-5) with 1, 2, 3, 4, 5
+                          const nonRange = selectedDiff.tiers.filter((t) => !/\d+\s*-\s*\d+/.test(t.label));
+                          const all = nonRange.length > 0 ? nonRange : [...selectedDiff.tiers];
                           setSelectedTiers(all);
                           setFormSaleOverride(all.reduce((s, t) => s + t.price, 0));
                           setTierPlayerMap({});
