@@ -1282,9 +1282,16 @@ function Dashboard({
   };
 
   const toggleSelectedPlayer = (playerId: string) => {
-    setSelectedPlayers((current) =>
-      current.includes(playerId) ? current.filter((id) => id !== playerId) : [...current, playerId]
-    );
+    setSelectedPlayers((current) => {
+      if (current.includes(playerId)) {
+        return current.filter((id) => id !== playerId);
+      }
+      if (current.length >= defaultCarryCount) {
+        notify(`เลือกคนแบกได้สูงสุด ${defaultCarryCount} คน (ตามที่ตั้งค่าระบบไว้)`);
+        return current;
+      }
+      return [...current, playerId];
+    });
   };
 
   const openAdd = () => {
@@ -1410,6 +1417,10 @@ function Dashboard({
           notify(isMaya ? `กรุณาเลือกคนแบกสำหรับ ${t.label}` : `กรุณาเลือกคนแบกสำหรับชั้น ${t.label}`);
           return;
         }
+        if (assigned.length > defaultCarryCount) {
+          notify(isMaya ? `${t.label} เลือกคนแบกเกินจำนวนสูงสุด (สูงสุด ${defaultCarryCount} คน)` : `ชั้น ${t.label} เลือกคนแบกเกินจำนวนสูงสุด (สูงสุด ${defaultCarryCount} คน)`);
+          return;
+        }
       }
       segments = tiersForSplit.map((t) => ({
         tierLabel: t.label,
@@ -1420,6 +1431,10 @@ function Dashboard({
     } else {
       if (selectedPlayers.length === 0) {
         notify("กรุณาเลือกผู้เล่นทีมแบกอย่างน้อย 1 คน");
+        return;
+      }
+      if (selectedPlayers.length > defaultCarryCount) {
+        notify(`เลือกคนแบกเกินจำนวนสูงสุดที่ตั้งไว้ (เลือกได้สูงสุด ${defaultCarryCount} คน)`);
         return;
       }
       segments = selectedTiers.map((t) => ({
@@ -3238,14 +3253,16 @@ function Dashboard({
                   {!isSplitCarry ? (
                     <div>
                       <div className="picker-heading" style={{ display: "flex", justifyContent: "space-between", margin: "10px 0 6px" }}>
-                        <strong>เลือกทีมแบก (ทุกชั้น)</strong>
-                        <span style={{ fontSize: "12px", color: selectedPlayers.length > 0 ? "#27ae60" : "#e67e22", fontWeight: 700 }}>
-                          เลือกแล้ว {selectedPlayers.length} คน
+                        <strong>เลือกทีมแบก (ทุกชั้น · สูงสุด {defaultCarryCount} คน)</strong>
+                        <span style={{ fontSize: "12px", color: selectedPlayers.length === defaultCarryCount ? "#27ae60" : selectedPlayers.length > 0 ? "#176bca" : "#e67e22", fontWeight: 700 }}>
+                          เลือกแล้ว {selectedPlayers.length}/{defaultCarryCount} คน
                         </span>
                       </div>
                       <div className="player-picker" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
                         {memberList.map((player) => {
                           const isChecked = selectedPlayers.includes(player.id);
+                          const isMax = selectedPlayers.length >= defaultCarryCount;
+                          const isDisabled = !isChecked && isMax;
                           return (
                             <label
                               key={player.id}
@@ -3254,16 +3271,18 @@ function Dashboard({
                                 padding: "8px 10px",
                                 borderRadius: "6px",
                                 border: isChecked ? "1.5px solid #176bca" : "1px solid #dce4ec",
-                                background: isChecked ? "#edf5fd" : "#fff",
+                                background: isChecked ? "#edf5fd" : isDisabled ? "#f8fafc" : "#fff",
+                                opacity: isDisabled ? 0.45 : 1,
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "8px",
-                                cursor: "pointer"
+                                cursor: isDisabled ? "not-allowed" : "pointer"
                               }}
                             >
                               <input
                                 type="checkbox"
                                 checked={isChecked}
+                                disabled={isDisabled}
                                 onChange={() => toggleSelectedPlayer(player.id)}
                               />
                               <PlayerAvatar player={player} small />
@@ -3411,21 +3430,29 @@ function Dashboard({
                                     </small>
                                   )}
                                 </strong>
-                                <small style={{ color: assigned.length > 0 ? "#22c55e" : "#f59e0b", fontWeight: 700 }}>
+                                <small style={{ color: assigned.length === defaultCarryCount ? "#22c55e" : assigned.length > 0 ? "#176bca" : "#f59e0b", fontWeight: 700 }}>
                                   {assigned.length > 0
-                                    ? `${assigned.length} คน → คนละ ฿${formatMoney(tierWage)}`
-                                    : "ยังไม่เลือกคน"}
+                                    ? `${assigned.length}/${defaultCarryCount} คน → คนละ ฿${formatMoney(tierWage)}`
+                                    : `ยังไม่เลือกคน (สูงสุด ${defaultCarryCount} คน)`}
                                 </small>
                               </div>
                               <div className="tier-player-chips">
                                 {memberList.map((p) => {
                                   const isOn = assigned.includes(p.id);
+                                  const isMax = assigned.length >= defaultCarryCount;
+                                  const isDisabled = !isOn && isMax;
                                   return (
                                     <button
                                       key={p.id}
                                       type="button"
                                       className={`tier-pchip${isOn ? " active" : ""}`}
+                                      disabled={isDisabled}
+                                      style={isDisabled ? { opacity: 0.35, cursor: "not-allowed" } : undefined}
                                       onClick={() => {
+                                        if (isDisabled) {
+                                          notify(`แต่ละชั้นเลือกคนแบกได้สูงสุด ${defaultCarryCount} คน (ตามที่ตั้งค่าระบบไว้)`);
+                                          return;
+                                        }
                                         const next = isOn ? assigned.filter((x) => x !== p.id) : [...assigned, p.id];
                                         setTierPlayerMap({ ...tierPlayerMap, [tier.label]: next });
                                       }}
