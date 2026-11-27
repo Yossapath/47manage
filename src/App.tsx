@@ -317,8 +317,10 @@ function getPlayerWageForRun(
 
 function getNowDateStr(): string {
   const now = new Date();
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${now.getDate()}-${months[now.getMonth()]}`;
+  const d = String(now.getDate()).padStart(2, "0");
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const y = now.getFullYear() + 543;
+  return `${d}/${m}/${y}`;
 }
 
 function getNowTimeStr(): string {
@@ -1107,11 +1109,23 @@ function Dashboard({
     };
   }, []);
 
-  // Helper: parse "DD-MMM" or "DD/MM/YY" date strings into a comparable Date
+  // Helper: parse "DD/MM/YYYY" (BE/CE) or "DD-MMM" date strings into a comparable Date
   const parseRowDate = (dateStr: string): Date | null => {
     if (!dateStr) return null;
-    // Try "DD-MMM" e.g. "23-Nov"
-    const m1 = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})(?:-(\d{2,4}))?/);
+    const str = dateStr.trim();
+
+    // 1. Try "DD/MM/YY" or "DD/MM/YYYY" e.g. "27/11/2569" or "27/11/2026"
+    const m2 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m2) {
+      let yr = m2[3].length === 2 ? 2000 + Number(m2[3]) : Number(m2[3]);
+      if (yr > 2400) {
+        yr -= 543; // Thai Buddhist Era to CE
+      }
+      return new Date(yr, Number(m2[2]) - 1, Number(m2[1]));
+    }
+
+    // 2. Try "DD-MMM" e.g. "23-Nov"
+    const m1 = str.match(/^(\d{1,2})-([A-Za-z]{3})(?:-(\d{2,4}))?/);
     if (m1) {
       const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
       const mon = months[m1[2]];
@@ -1119,12 +1133,6 @@ function Dashboard({
         const yr = m1[3] ? (m1[3].length === 2 ? 2000 + Number(m1[3]) : Number(m1[3])) : new Date().getFullYear();
         return new Date(yr, mon, Number(m1[1]));
       }
-    }
-    // Try "DD/MM/YY" or "DD/MM/YYYY"
-    const m2 = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-    if (m2) {
-      const yr = m2[3].length === 2 ? 2000 + Number(m2[3]) : Number(m2[3]);
-      return new Date(yr, Number(m2[2]) - 1, Number(m2[1]));
     }
     return null;
   };
@@ -3031,14 +3039,50 @@ function Dashboard({
               <div className="form-grid">
                 <label className="field">
                   <span>วันที่</span>
-                  <input
-                    name="date"
-                    type="text"
-                    required
-                    value={formDate || getNowDateStr()}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    placeholder={getNowDateStr()}
-                  />
+                  <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                    <input
+                      name="date"
+                      type="text"
+                      required
+                      value={formDate || getNowDateStr()}
+                      onChange={(e) => setFormDate(e.target.value)}
+                      placeholder={getNowDateStr()}
+                      style={{ width: "100%", paddingRight: "34px", boxSizing: "border-box" }}
+                    />
+                    <input
+                      type="date"
+                      id="date-picker-helper"
+                      style={{
+                        position: "absolute",
+                        right: "4px",
+                        width: "28px",
+                        height: "28px",
+                        opacity: 0,
+                        cursor: "pointer",
+                        zIndex: 2
+                      }}
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        const [yyyy, mm, dd] = e.target.value.split("-");
+                        if (yyyy && mm && dd) {
+                          const thaiYear = Number(yyyy) + 543;
+                          setFormDate(`${dd}/${mm}/${thaiYear}`);
+                        }
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: "8px",
+                        pointerEvents: "none",
+                        fontSize: "16px",
+                        color: "#64748b"
+                      }}
+                      title="เลือกจากปฏิทิน"
+                    >
+                      📅
+                    </span>
+                  </div>
                 </label>
                 <label className="field">
                   <span>เวลา</span>
