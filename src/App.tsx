@@ -519,7 +519,7 @@ function AdminAuthModal({
         <div style={{ textAlign: "center", marginBottom: "16px" }}>
           <img
             src={logoUrl}
-            alt="47Ravenge Logo"
+            alt="47Revenge Logo"
             style={{
               width: "52px",
               height: "52px",
@@ -535,7 +535,7 @@ function AdminAuthModal({
           </h2>
           <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>
             {view === "login"
-              ? "ระบบจัดการและบันทึกข้อมูลกิลด์ 47Ravenge"
+              ? "ระบบจัดการและบันทึกข้อมูลกิลด์ 47Revenge"
               : "สร้างบัญชีผู้ดูแลระบบเพื่อเข้าจัดการข้อมูล"}
           </p>
         </div>
@@ -729,7 +729,8 @@ function PlayerDetailModal({
   const comPlayer = memberList.find((p) => isPlayerMatch(p, row.commissionTo));
   const isMayaRow = Boolean(row.dungeon?.toLowerCase().includes("maya"));
   const cleanTier = isMayaRow ? row.tier.replace(/ชั้น\s*/gi, "") : row.tier;
-  const diffLabel = [row.difficulty, cleanTier].filter(Boolean).join(" · ");
+  const cleanDiff = isMayaRow ? "" : row.difficulty;
+  const diffLabel = [cleanDiff, cleanTier].filter(Boolean).join(" · ");
 
   const baseSum = (row.segments && row.segments.length > 0)
     ? row.segments.reduce((sum, s) => sum + (Number(s.price) || 0), 0)
@@ -986,12 +987,15 @@ function Dashboard({
       const data: PaymentRow[] = [];
       snapshot.forEach((d) => {
         const val = d.data();
+        const dungName = val.dungeon || val.detail || "Apo";
+        const isMayaRow = dungName.toLowerCase().includes("maya");
+        const rowDiff = isMayaRow ? "" : (val.difficulty || "");
         data.push({
           id: d.id,
-          date: val.date || "23-Nov",
-          time: val.time || "21:00",
-          dungeon: val.dungeon || val.detail || "Apo",
-          difficulty: val.difficulty || "",
+          date: val.date || getNowDateStr(),
+          time: val.time || getNowTimeStr(),
+          dungeon: dungName,
+          difficulty: rowDiff,
           tier: val.tier || "",
           ctm: val.ctm || val.customer || "-",
           price: Number(val.price || val.sale) || 0,
@@ -1035,9 +1039,28 @@ function Dashboard({
     const unsubDungeons = onSnapshot(doc(db, "settings", "dungeons"), (docSnap) => {
       if (docSnap.exists()) {
         const val = docSnap.data();
-        // Load new dungeon template system
+        // Load dungeon template system and sanitize Maya difficulties (remove any accidental Nightmare)
         if (Array.isArray(val.templates) && val.templates.length > 0) {
-          setDungeonTemplates(val.templates);
+          let hadMayaNightmare = false;
+          const sanitized = val.templates.map((tmpl: DungeonTemplate) => {
+            const isMayaTmpl = tmpl.id.toLowerCase().includes("maya") || tmpl.name.toLowerCase().includes("maya");
+            if (isMayaTmpl) {
+              const cleanedDiffs = (tmpl.difficulties || []).filter((diff) => {
+                const isNm = diff.name.toLowerCase().includes("nightmare");
+                if (isNm) hadMayaNightmare = true;
+                return !isNm;
+              });
+              return {
+                ...tmpl,
+                difficulties: cleanedDiffs.length > 0 ? cleanedDiffs : [{ name: "ระดับเดียว", tiers: [{ label: "เต็มรอบ", price: 0 }] }],
+              };
+            }
+            return tmpl;
+          });
+          setDungeonTemplates(sanitized);
+          if (hadMayaNightmare) {
+            setDoc(doc(db, "settings", "dungeons"), { templates: sanitized }).catch(() => {});
+          }
         }
       }
     });
@@ -1190,12 +1213,13 @@ function Dashboard({
 
     dungeonTemplates.forEach((tmpl) => {
       seenDungNames.add(tmpl.name.toLowerCase());
-      if (tmpl.difficulties && tmpl.difficulties.length > 1) {
+      const isMayaTmpl = tmpl.id.toLowerCase().includes("maya") || tmpl.name.toLowerCase().includes("maya");
+      if (!isMayaTmpl && tmpl.difficulties && tmpl.difficulties.length > 1) {
         list.push({ value: `dungeon:${tmpl.name}`, label: `${tmpl.name} (ทั้งหมด)` });
         tmpl.difficulties.forEach((diff) => {
           list.push({ value: `diff:${tmpl.name}:${diff.name}`, label: `${tmpl.name} ${diff.name}` });
         });
-      } else if (tmpl.difficulties && tmpl.difficulties.length === 1 && tmpl.difficulties[0].name && tmpl.difficulties[0].name !== "ระดับเดียว") {
+      } else if (!isMayaTmpl && tmpl.difficulties && tmpl.difficulties.length === 1 && tmpl.difficulties[0].name && tmpl.difficulties[0].name !== "ระดับเดียว") {
         list.push({ value: `dungeon:${tmpl.name}`, label: `${tmpl.name} (${tmpl.difficulties[0].name})` });
       } else {
         list.push({ value: `dungeon:${tmpl.name}`, label: tmpl.name });
@@ -1228,14 +1252,14 @@ function Dashboard({
     dungeonTemplates.find((t) => t.id === formDungeonId) || dungeonTemplates[0],
     [dungeonTemplates, formDungeonId]
   );
-  const selectedDiff = useMemo(() =>
-    selectedTemplate?.difficulties.find((d) => d.name === formDiffName) || selectedTemplate?.difficulties[0],
-    [selectedTemplate, formDiffName]
-  );
   const isMaya = useMemo(() =>
     Boolean(selectedTemplate && (selectedTemplate.id.toLowerCase().includes("maya") || selectedTemplate.name.toLowerCase().includes("maya"))),
     [selectedTemplate]
   );
+  const selectedDiff = useMemo(() => {
+    if (isMaya) return selectedTemplate?.difficulties[0];
+    return selectedTemplate?.difficulties.find((d) => d.name === formDiffName) || selectedTemplate?.difficulties[0];
+  }, [selectedTemplate, formDiffName, isMaya]);
 
   // Aggregated list: memberList + any player / commission recipient mentioned in rows
   const allActivePlayers = useMemo(() => {
@@ -1318,7 +1342,8 @@ function Dashboard({
     setIsSplitCarry(false);
     setTierPlayerMap({});
     const firstTemplate = dungeonTemplates[0];
-    const firstDiff = firstTemplate?.difficulties[0];
+    const isMayaFirst = Boolean(firstTemplate && (firstTemplate.id.toLowerCase().includes("maya") || firstTemplate.name.toLowerCase().includes("maya")));
+    const firstDiff = isMayaFirst ? undefined : firstTemplate?.difficulties[0];
     setFormDungeonId(firstTemplate?.id || "");
     setFormDiffName(firstDiff?.name || "");
     setFormCommissionTo("-");
@@ -1333,12 +1358,20 @@ function Dashboard({
     setShowAdd(true);
   };
 
+  useEffect(() => {
+    if (showAdd && !editRow) {
+      setFormDate(getNowDateStr());
+      setFormTime(getNowTimeStr());
+    }
+  }, [showAdd, editRow]);
+
   const openEdit = (row: PaymentRow) => {
     setCurrentSlipBase64(row.slip || "");
     const tmpl = dungeonTemplates.find((t) => t.name === row.dungeon) || dungeonTemplates[0];
     const diff = tmpl?.difficulties.find((d) => d.name === row.difficulty) || tmpl?.difficulties[0];
+    const isMayaRun = Boolean(row.dungeon?.toLowerCase().includes("maya"));
     setFormDungeonId(tmpl?.id || "");
-    setFormDiffName(row.difficulty || diff?.name || "");
+    setFormDiffName(isMayaRun ? "" : (row.difficulty || diff?.name || ""));
     setFormSaleOverride(row.sale);
     setFormDate(row.date || getNowDateStr());
     setFormTime(row.time || getNowTimeStr());
@@ -1426,7 +1459,7 @@ function Dashboard({
     const tmpl = dungeonTemplates.find((t) => t.id === formDungeonId) || selectedTemplate;
     const isMaya = Boolean(tmpl && (tmpl.id.toLowerCase().includes("maya") || tmpl.name.toLowerCase().includes("maya")));
     const dungeonName = tmpl?.name || "ไม่ระบุ";
-    const diffName = formDiffName || "";
+    const diffName = isMaya ? "" : (formDiffName === "ระดับเดียว" ? "" : formDiffName);
 
     let finalPlayers: string[] = [];
     let segments: RunSegment[] = [];
@@ -1814,7 +1847,8 @@ function Dashboard({
       : equalWage;
     const isMaya = Boolean(row.dungeon?.toLowerCase().includes("maya"));
     const cleanTier = isMaya ? row.tier.replace(/ชั้น\s*/gi, "") : row.tier;
-    const diffLabel = [row.difficulty, cleanTier].filter(Boolean).join(" · ");
+    const cleanDiff = isMaya ? "" : row.difficulty;
+    const diffLabel = [cleanDiff, cleanTier].filter(Boolean).join(" · ");
     return (
       <tr key={row.id}>
         <td>
@@ -1906,8 +1940,8 @@ function Dashboard({
       {/* ======================== SIDEBAR ======================== */}
       <aside className="sidebar">
         <div className="side-brand">
-          <img src={logoUrl} alt="47Ravenge Logo" className="brand-logo-img" />
-          {sidebarOpen && <div><strong>47RAVENGE</strong><small>Reward Management</small></div>}
+          <img src={logoUrl} alt="47Revenge Logo" className="brand-logo-img" />
+          {sidebarOpen && <div><strong>47REVENGE</strong><small>Reward Management</small></div>}
         </div>
 
         <button
@@ -2349,7 +2383,7 @@ function Dashboard({
                         </div>
                       </div>
                       <h3>{player.name}</h3>
-                      <p>สมาชิกทีม 47Ravenge</p>
+                      <p>สมาชิกทีม 47Revenge</p>
                       <div className="member-metrics">
                         <div>
                           <span>รอบที่เล่น</span>
@@ -3001,9 +3035,9 @@ function Dashboard({
                     name="date"
                     type="text"
                     required
-                    value={formDate}
+                    value={formDate || getNowDateStr()}
                     onChange={(e) => setFormDate(e.target.value)}
-                    placeholder="เช่น 24-Nov"
+                    placeholder={getNowDateStr()}
                   />
                 </label>
                 <label className="field">
@@ -3012,7 +3046,7 @@ function Dashboard({
                     name="time"
                     type="time"
                     required
-                    value={formTime}
+                    value={formTime || getNowTimeStr()}
                     onChange={(e) => setFormTime(e.target.value)}
                   />
                 </label>
@@ -3026,7 +3060,8 @@ function Dashboard({
                   onChange={(e) => {
                     const tmpl = dungeonTemplates.find((t) => t.id === e.target.value);
                     setFormDungeonId(e.target.value);
-                    const firstDiff = tmpl?.difficulties[0];
+                    const isMayaTmpl = Boolean(tmpl && (tmpl.id.toLowerCase().includes("maya") || tmpl.name.toLowerCase().includes("maya")));
+                    const firstDiff = isMayaTmpl ? undefined : tmpl?.difficulties[0];
                     setFormDiffName(firstDiff?.name || "");
                     setSelectedTiers([]);
                     setFormSaleOverride(0);
@@ -3041,7 +3076,7 @@ function Dashboard({
               </label>
 
               {/* Level 2: Difficulty */}
-              {selectedTemplate && selectedTemplate.difficulties.length > 1 && (
+              {selectedTemplate && selectedTemplate.difficulties.length > 1 && !isMaya && (
                 <label className="field">
                   <span>ความยาก</span>
                   <select
